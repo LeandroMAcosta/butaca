@@ -76,21 +76,9 @@ func (a *App) SearchEpisode(ctx context.Context, it *store.Item, season, episode
 	if err != nil {
 		return nil, err
 	}
-	// A search for one episode still returns whole-season packs and the wrong
-	// episodes, so anything that is not this exact episode is rejected.
 	for i := range cands {
-		p := cands[i].Parsed
-		if p.Season != 0 && p.Season != season {
-			cands[i].Rejects = append(cands[i].Rejects,
-				fmt.Sprintf("season %d, want %d", p.Season, season))
-		}
-		if p.Episode != 0 && p.Episode != episode {
-			cands[i].Rejects = append(cands[i].Rejects,
-				fmt.Sprintf("episode %d, want %d", p.Episode, episode))
-		}
-		if p.Episode == 0 {
-			cands[i].Rejects = append(cands[i].Rejects, "not a single episode")
-		}
+		cands[i].Rejects = append(cands[i].Rejects,
+			decide.EpisodeRejections(cands[i].Parsed, season, episode)...)
 	}
 	return cands, nil
 }

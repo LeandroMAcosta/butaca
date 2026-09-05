@@ -162,6 +162,22 @@ subtitles:
 filesystem. If they do not, imports fail loudly rather than silently copying and
 doubling disk usage.
 
+## Series
+
+```sh
+butaca add "Severance" --series
+```
+
+Seasons and episodes come from TMDB, so series need a key. Each aired,
+monitored episode is searched individually and imported as:
+
+```
+Severance (2022)/Season 02/Severance (2022) - S02E10 - Cold Harbor.mkv
+```
+
+Season packs are rejected for single-episode searches: they need different
+import handling, and mixing the two silently produces wrong filenames.
+
 ## Tests
 
 ```sh

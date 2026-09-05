@@ -239,3 +239,28 @@ func TestSourcePreferenceBeatsEqualResolution(t *testing.T) {
 		t.Fatalf("picked the %s release; Blu-ray should outrank HDTV at equal resolution", best.Parsed.Source)
 	}
 }
+
+func TestEpisodeRejections(t *testing.T) {
+	cases := []struct {
+		name   string
+		parsed parse.Result
+		wantOK bool
+	}{
+		{"exact episode", parse.Result{Season: 1, Episode: 2}, true},
+		{"season pack", parse.Result{Season: 1}, false},
+		{"wrong episode", parse.Result{Season: 1, Episode: 5}, false},
+		{"wrong season", parse.Result{Season: 2, Episode: 2}, false},
+		{"no episode info at all", parse.Result{}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := EpisodeRejections(tc.parsed, 1, 2)
+			if tc.wantOK && len(got) != 0 {
+				t.Fatalf("expected a match, got rejections %v", got)
+			}
+			if !tc.wantOK && len(got) == 0 {
+				t.Fatal("expected a rejection, got none")
+			}
+		})
+	}
+}

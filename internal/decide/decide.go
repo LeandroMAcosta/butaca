@@ -222,3 +222,25 @@ func Pick(cands []Candidate) *Candidate {
 	}
 	return best
 }
+
+// EpisodeRejections reports why a candidate is not the requested episode.
+//
+// A search for one episode still returns season packs, the wrong episode and
+// unrelated files, so identity has to be re-checked after scoring. An empty
+// result means the candidate is that episode.
+func EpisodeRejections(p parse.Result, season, episode int) []string {
+	var out []string
+	switch {
+	case p.Episode == 0 && p.Season != 0:
+		out = append(out, fmt.Sprintf("season %d pack, not a single episode", p.Season))
+	case p.Episode == 0:
+		out = append(out, "not a single episode")
+	}
+	if p.Season != 0 && p.Season != season {
+		out = append(out, fmt.Sprintf("season %d, want %d", p.Season, season))
+	}
+	if p.Episode != 0 && p.Episode != episode {
+		out = append(out, fmt.Sprintf("episode %d, want %d", p.Episode, episode))
+	}
+	return out
+}
