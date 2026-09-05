@@ -5,7 +5,9 @@ Bazarr with a single service; keeps Prowlarr (indexer aggregation) and
 qBittorrent (downloading), because those two are worth delegating to.
 
 **Status: M1.** Movies work end to end — add, search, decide, grab, import,
-subtitles. Series (M4), the MCP server (M3) and the TUI (M5) are not built yet.
+subtitles — plus migration from an existing Radarr catalog and a first-run
+setup wizard. Series (M4), the MCP server (M3) and the full TUI (M5) are not
+built yet.
 
 ## Why
 
@@ -64,10 +66,26 @@ cd sidecar && uv run --with fastapi --with 'uvicorn[standard]' \
   --with guessit --with subliminal --with babelfish \
   uvicorn app:app --port 8000
 
-export PROWLARR_API_KEY=...
-./butaca config init
+./butaca setup          # asks where media lives, which language, which subtitles
 ./butaca status
 ```
+
+The wizard runs automatically the first time butaca is used interactively.
+Non-interactive runs (Docker, cron, MCP) skip it and use defaults and
+environment variables instead.
+
+## Migrating from Radarr
+
+```sh
+butaca migrate --dry-run    # preview
+butaca migrate              # apply
+butaca orphans              # downloads no catalog entry points at
+```
+
+Nothing is moved, copied or deleted — only the catalog is written, so it is
+safe to run while the old stack is still installed. Radarr stores the original
+language as an integer in its own enum, which `migrate` maps back to ISO codes
+so `language_mode: original` keeps working for the imported films.
 
 ## Usage
 
@@ -81,6 +99,9 @@ butaca list
 butaca rm "Taxi Driver"                     # catalog + disk + torrent
 butaca status                               # dependency health and queue
 butaca config set paths.movies /media/movies
+butaca setup                                # re-run the wizard
+butaca migrate                              # import a Radarr catalog
+butaca orphans                              # unaccounted-for downloads
 ```
 
 `--alt-title` matters for foreign-language films: releases are usually named
