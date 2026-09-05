@@ -80,3 +80,44 @@ func (s *Store) ClearSubtitles(fileID int64) error {
 	_, err := s.db.Exec(`DELETE FROM subtitles WHERE file_id = ?`, fileID)
 	return err
 }
+
+// HistoryEntry is one recorded event.
+type HistoryEntry struct {
+	At     string
+	Event  string
+	Detail string
+}
+
+// EventsByType returns matching history rows, newest first.
+func (s *Store) EventsByType(events []string, limit int) ([]HistoryEntry, error) {
+	if len(events) == 0 {
+		return nil, nil
+	}
+	if limit <= 0 {
+		limit = 50
+	}
+	placeholders := make([]string, len(events))
+	args := make([]any, 0, len(events)+1)
+	for i, e := range events {
+		placeholders[i] = "?"
+		args = append(args, e)
+	}
+	args = append(args, limit)
+	rows, err := s.db.Query(`
+		SELECT at, event, COALESCE(detail,'') FROM history
+		WHERE event IN (`+strings.Join(placeholders, ",")+`)
+		ORDER BY id DESC LIMIT ?`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []HistoryEntry
+	for rows.Next() {
+		var h HistoryEntry
+		if err := rows.Scan(&h.At, &h.Event, &h.Detail); err != nil {
+			return nil, err
+		}
+		out = append(out, h)
+	}
+	return out, rows.Err()
+}

@@ -44,6 +44,13 @@ func (s RemoveStep) String() string {
 func (a *App) Remove(ctx context.Context, it *store.Item, opt RemoveOptions) ([]RemoveStep, error) {
 	var steps []RemoveStep
 
+	// Record the intent before acting. history.item_id is ON DELETE SET NULL,
+	// so this row survives the deletion and leaves an audit trail: without it a
+	// removal is invisible afterwards, and "where did my film go?" has no answer.
+	_ = a.Store.Log(it.ID, "remove_requested", fmt.Sprintf(
+		"%s (%d) path=%s keepFiles=%v keepTorrent=%v",
+		it.Title, it.Year, it.Path, opt.KeepFiles, opt.KeepTorrent))
+
 	if !opt.KeepFiles && it.Path != "" {
 		if _, err := os.Stat(it.Path); err == nil {
 			err := library.RemoveFolder(it.Path)
@@ -78,6 +85,7 @@ func (a *App) Remove(ctx context.Context, it *store.Item, opt RemoveOptions) ([]
 		return steps, fmt.Errorf("remove %s from catalog: %w", it.Title, err)
 	}
 	steps = append(steps, RemoveStep{What: "removed from catalog", Done: true})
+	_ = a.Store.Log(0, "removed", it.Title)
 	return steps, nil
 }
 
@@ -107,4 +115,10 @@ func shortHash(h string) string {
 		return h[:8]
 	}
 	return h
+}
+
+// RemovalHistory returns the audit trail of deletions, newest first. It answers
+// "what happened to my film?" after the catalog row is gone.
+func (a *App) RemovalHistory(limit int) ([]store.HistoryEntry, error) {
+	return a.Store.EventsByType([]string{"remove_requested", "removed"}, limit)
 }

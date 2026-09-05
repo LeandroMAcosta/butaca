@@ -55,6 +55,13 @@ names. Two consequences that have already caused bugs:
   `library.SameFilesystem` checks this and `status` reports it. Never fall back
   to copying: it silently doubles disk usage.
 
+**Deletions are audited before they happen.** `app.Remove` writes a
+`remove_requested` row to `history` *before* touching anything, and
+`history.item_id` is `ON DELETE SET NULL`, so the record survives the row it
+describes. `butaca removals` reads it. This exists because four films once
+vanished from the catalog and the library with no trace of what removed them —
+the bytes survived in `~/Downloads` only because imports are hardlinks.
+
 **`items.state` separates intent from action.** `watchlist` entries are
 catalogued but never searched; `SearchMissing` skips them. This is the only
 thing stopping a two-hundred-film Letterboxd import from starting two hundred

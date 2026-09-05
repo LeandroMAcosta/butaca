@@ -120,6 +120,7 @@ butaca search Amélie --grab                 # send the winner to qBittorrent
 butaca import --watch                       # import finished downloads
 butaca list
 butaca rm "Taxi Driver"                     # catalog + disk + torrent
+butaca removals                             # audit trail of what was deleted
 butaca status                               # dependency health and queue
 butaca config set paths.movies /media/movies
 butaca setup                                # re-run the wizard

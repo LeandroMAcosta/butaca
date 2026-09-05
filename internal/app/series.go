@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -136,8 +137,20 @@ func (a *App) GrabEpisode(ctx context.Context, it *store.Item, ep *store.Episode
 	return a.Store.Log(it.ID, "grabbed", fmt.Sprintf("S%02dE%02d %s", ep.Season, ep.Number, c.Release.Title))
 }
 
-// SearchMissingFor searches one catalog entry, movie or series.
+// ErrOnWatchlist is returned when something would be downloaded that the user
+// only marked as "some day".
+var ErrOnWatchlist = errors.New("this is on the watchlist and will not be downloaded")
+
+// SearchMissingFor searches one catalog entry, movie or series, and grabs the
+// best release.
+//
+// It refuses watchlist entries. Enforcing that here rather than at each call
+// site is deliberate: the watchlist is only meaningful if nothing can download
+// from it by accident, and there are four places that grab.
 func (a *App) SearchMissingFor(ctx context.Context, it *store.Item) ([]string, error) {
+	if it.State == store.StateWatchlist {
+		return nil, fmt.Errorf("%w: promote %q first with `butaca watch`", ErrOnWatchlist, it.Title)
+	}
 	if it.Kind == "series" {
 		return a.searchMissingEpisodes(ctx, it)
 	}
