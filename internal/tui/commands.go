@@ -52,6 +52,9 @@ type (
 // Every command guards against a nil app so the model can be exercised
 // headlessly: the views and key handling are testable without a database or a
 // running Prowlarr.
+// contextTODO centralises the background context these commands run under.
+func contextTODO() context.Context { return context.Background() }
+
 func (b *browser) reload() tea.Cmd {
 	if b.app == nil {
 		return nil

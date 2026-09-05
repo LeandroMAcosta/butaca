@@ -139,3 +139,6 @@ those tests are the specification.
 - Season packs are rejected for single-episode searches; they need different
   import handling.
 - No HTTP API. Interfaces are CLI, TUI and MCP.
+- `find` / the TUI's `a` key work without TMDB by matching the query against
+  release names; the item gets no `original_language`, which the engine reads as
+  "no language constraint" rather than rejecting everything.

@@ -55,6 +55,21 @@ func (b *browser) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return b, b.reload()
 
+	case addSearched:
+		b.working = false
+		if m.err != nil {
+			b.err = m.err
+			return b, nil
+		}
+		if b.add == nil {
+			b.add = &addState{query: m.query}
+		}
+		b.add.cands, b.add.searched, b.add.cursor = m.cands, true, 0
+		sortCandidates(b.add.cands)
+		b.mode = modeAdd
+		b.status = fmt.Sprintf("%d releases for %q", len(m.cands), m.query)
+		return b, nil
+
 	case searchDone:
 		b.working = false
 		if m.err != nil {
@@ -115,6 +130,8 @@ func (b *browser) handleKey(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	switch b.mode {
+	case modeAdd:
+		return b.addKey(k)
 	case modeSearch:
 		return b.searchKey(k)
 	case modeConfirm:

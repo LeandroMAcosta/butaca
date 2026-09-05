@@ -110,6 +110,8 @@ disk space.
 
 ```sh
 butaca tui                                  # five tabs: library, watchlist, queue, discover, profiles
+butaca find "Dune Part Two 2024"            # search for something you don't have
+butaca find "Dune Part Two 2024" --grab 1   # add it and start the download
 butaca add "Taxi Driver" --year 1976        # add and search
 butaca add "Severance" --series             # series need a TMDB key
 butaca add "Amélie" --lang fr --alt-title "Le Fabuleux Destin d'Amélie Poulain"
@@ -124,6 +126,10 @@ butaca setup                                # re-run the wizard
 butaca migrate                              # import a Radarr catalog
 butaca orphans                              # unaccounted-for downloads
 ```
+
+`find` is the one to reach for when a film is not in the catalog yet: it needs
+no TMDB key, because the release name supplies the year. `add` is for when you
+already know exactly what you want catalogued.
 
 `--alt-title` matters for foreign-language films: releases are usually named
 after the original title. With a TMDB key it is filled in automatically.

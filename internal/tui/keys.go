@@ -55,6 +55,11 @@ func (b *browser) listKey(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 			b.filtering = true
 		}
 		return b, nil
+	case "a":
+		b.add = &addState{}
+		b.mode = modeAdd
+		b.err = nil
+		return b, nil
 	case "r":
 		b.status = "refreshing…"
 		return b, tea.Batch(b.reload(), b.checkHealth())

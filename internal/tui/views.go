@@ -23,6 +23,9 @@ func (b *browser) View() string {
 	case modeSearch:
 		s.WriteString(b.viewSearch())
 		return s.String()
+	case modeAdd:
+		s.WriteString(b.viewAdd())
+		return s.String()
 	case modeHelp:
 		s.WriteString(viewHelp())
 		return s.String()
@@ -104,7 +107,7 @@ func (b *browser) footer() string {
 	default:
 		s.WriteString(dimStyle.Render(b.status) + "\n")
 	}
-	s.WriteString(dimStyle.Render("↑↓ move · tab switch · enter detail · s search · d delete · w watchlist · p profile · / filter · i import · ? help · q quit"))
+	s.WriteString(dimStyle.Render("↑↓ move · tab switch · a add · enter detail · s search · d delete · w watchlist · p profile · / filter · i import · ? help · q quit"))
 	return s.String()
 }
 
@@ -244,6 +247,7 @@ func viewHelp() string {
 		{"/", "filter by title (esc clears)"},
 		{"enter", "detail, or accept a suggestion"},
 		{"enter (detail)", "open the file in " + fileManager()},
+		{"a", "add something new: type a title, pick a release"},
 		{"s", "search releases, with scores and rejection reasons"},
 		{"d", "delete: catalog, folder and torrent"},
 		{"w", "move between watchlist and monitored"},

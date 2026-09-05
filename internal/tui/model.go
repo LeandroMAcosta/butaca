@@ -35,6 +35,7 @@ const (
 	modeSearch
 	modeConfirm
 	modeHelp
+	modeAdd
 )
 
 // queuePoll is how often the queue refreshes while something is downloading.
@@ -69,6 +70,7 @@ type browser struct {
 	detail  *detailState
 	search  *searchState
 	confirm *confirmState
+	add     *addState
 
 	status  string
 	err     error

@@ -66,6 +66,7 @@ func main() {
 		newUnwatchCmd(),
 		newProfileCmd(),
 		newRecommendCmd(),
+		newFindCmd(),
 	)
 
 	if err := root.Execute(); err != nil {
