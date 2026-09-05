@@ -1,0 +1,69 @@
+# butaca, its parsing sidecar, and the two services it delegates to.
+#
+# The media volume is mounted at the SAME path in butaca and qbittorrent. That
+# is not cosmetic: imports are hardlinks, and a hardlink cannot cross a
+# filesystem boundary. Different mount points would break every import.
+
+services:
+  butaca:
+    build: .
+    depends_on: [butaca-parse, prowlarr, qbittorrent]
+    environment:
+      BUTACA_DATA_DIR: /data
+      BUTACA_MOVIES_PATH: /media/movies
+      BUTACA_TV_PATH: /media/tv
+      BUTACA_DOWNLOADS_PATH: /media/downloads
+      BUTACA_PROWLARR_URL: http://prowlarr:9696
+      BUTACA_QBITTORRENT_URL: http://qbittorrent:8080
+      BUTACA_PARSE_URL: http://butaca-parse:8000
+      PROWLARR_API_KEY: ${PROWLARR_API_KEY:?set PROWLARR_API_KEY in .env}
+      TMDB_API_KEY: ${TMDB_API_KEY:-}
+    volumes:
+      - butaca-data:/data
+      - media:/media
+    restart: unless-stopped
+
+  butaca-parse:
+    build: ./sidecar
+    volumes:
+      - media:/media          # subliminal writes .srt next to the video
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:latest
+    environment:
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
+      TZ: ${TZ:-Europe/Madrid}
+    volumes:
+      - prowlarr-config:/config
+    ports:
+      - "9696:9696"
+    restart: unless-stopped
+
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    environment:
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
+      TZ: ${TZ:-Europe/Madrid}
+      WEBUI_PORT: 8080
+    volumes:
+      - qbittorrent-config:/config
+      - media:/media          # same path as butaca, so hardlinks work
+    ports:
+      - "8080:8080"
+      - "6881:6881"
+      - "6881:6881/udp"
+    restart: unless-stopped
+
+volumes:
+  butaca-data:
+  prowlarr-config:
+  qbittorrent-config:
+  media:

@@ -1,0 +1,7 @@
+/butaca
+/dist/
+*.db
+*.db-shm
+*.db-wal
+.env
+config.yaml
