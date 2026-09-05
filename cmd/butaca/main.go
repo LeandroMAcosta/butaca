@@ -35,8 +35,10 @@ func main() {
 				return nil
 			}
 			var err error
-			cfg, err = config.Load(cfgPath)
-			return err
+			if cfg, err = config.Load(cfgPath); err != nil {
+				return err
+			}
+			return maybeRunSetup(cmd.Name())
 		},
 	}
 	root.PersistentFlags().StringVar(&cfgPath, "config", "", "config file (default ~/.config/butaca/config.yaml)")
@@ -49,6 +51,9 @@ func main() {
 		newRemoveCmd(),
 		newImportCmd(),
 		newStatusCmd(),
+		newMigrateCmd(),
+		newOrphansCmd(),
+		newSetupCmd(),
 	)
 
 	if err := root.Execute(); err != nil {
