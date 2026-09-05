@@ -64,8 +64,7 @@ func (b *browser) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if b.add == nil {
 			b.add = &addState{query: m.query}
 		}
-		b.add.cands, b.add.searched, b.add.cursor = m.cands, true, 0
-		sortCandidates(b.add.cands)
+		b.add.list, b.add.searched = newCandidateList(m.cands), true
 		b.mode = modeAdd
 		b.status = fmt.Sprintf("%d releases for %q", len(m.cands), m.query)
 		return b, nil

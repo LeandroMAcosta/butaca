@@ -136,14 +136,12 @@ func (b *browser) confirmKey(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 type searchState struct {
-	item   *store.Item
-	cands  []decide.Candidate
-	cursor int
+	item *store.Item
+	list *candidateList
 }
 
 func newSearchState(it *store.Item, cands []decide.Candidate) *searchState {
-	sortCandidates(cands)
-	return &searchState{item: it, cands: cands}
+	return &searchState{item: it, list: newCandidateList(cands)}
 }
 
 func (b *browser) searchKey(k tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -153,16 +151,13 @@ func (b *browser) searchKey(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 		b.mode = modeList
 		b.search = nil
 	case "up", "k":
-		if s.cursor > 0 {
-			s.cursor--
-		}
+		s.list.move(-1)
 	case "down", "j":
-		if s.cursor < len(s.cands)-1 {
-			s.cursor++
-		}
+		s.list.move(1)
+	case "x":
+		s.list.toggleRejected()
 	case "enter":
-		if s.cursor < len(s.cands) {
-			c := s.cands[s.cursor]
+		if c, ok := s.list.selected(); ok {
 			b.mode = modeList
 			b.working = true
 			b.status = "grabbing " + c.Release.Title + "…"

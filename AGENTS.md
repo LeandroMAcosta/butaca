@@ -139,6 +139,11 @@ those tests are the specification.
 - Season packs are rejected for single-episode searches; they need different
   import handling.
 - No HTTP API. Interfaces are CLI, TUI and MCP.
+- Release lists deduplicate before display: Prowlarr fans one query across every
+  tracker, so a popular film returns ~200 rows of which most are the same
+  release twice and the rest are rejects. `internal/tui/candidates.go` merges by
+  normalised title, keeps the best-seeded copy, shows one line each, and hides
+  rejects behind `x`. `cmd/butaca/find_cmd.go` does the same for the CLI.
 - `find` / the TUI's `a` key work without TMDB by matching the query against
   release names; the item gets no `original_language`, which the engine reads as
   "no language constraint" rather than rejecting everything.

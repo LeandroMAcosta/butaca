@@ -202,41 +202,26 @@ func (b *browser) viewSearch() string {
 	if s == nil {
 		return ""
 	}
-	accepted := 0
-	for _, c := range s.cands {
-		if c.Accepted() {
-			accepted++
-		}
-	}
 	var out strings.Builder
-	fmt.Fprintf(&out, "%s\n%s\n\n",
-		titleStyle.Render("Releases for "+s.item.Title),
-		dimStyle.Render(fmt.Sprintf("%d found, %d passed the rules", len(s.cands), accepted)))
+	out.WriteString(titleStyle.Render("Releases for "+s.item.Title) + "\n")
+	out.WriteString(dimStyle.Render(s.list.summary(s.item.Title)) + "\n")
+	out.WriteString(dimStyle.Render("The list is ordered by butaca's score: the top one is what it would pick.") + "\n\n")
 
-	limit := b.height - 12
-	if limit < 5 {
-		limit = 5
-	}
-	for i, c := range s.cands {
-		if i >= limit {
-			fmt.Fprintf(&out, "%s\n", dimStyle.Render(fmt.Sprintf("  … and %d more", len(s.cands)-i)))
-			break
-		}
-		mark := warnStyle.Render("REJECT")
-		if c.Accepted() {
-			mark = okStyle.Render("ok    ")
-		}
-		line := fmt.Sprintf("%s %5d  %s", mark, c.Score, truncate(c.Release.Title, b.width-24))
-		out.WriteString(cursorFor(i == s.cursor) + render(i == s.cursor, line) + "\n")
-		fmt.Fprintf(&out, "        %s\n", dimStyle.Render(fmt.Sprintf("%s · %s · %d seeders · %s",
-			orDash(c.Parsed.ScreenSize), library.HumanSize(c.Release.Size), c.Release.Seeders, c.Release.Indexer)))
-		// The reason a release was rejected is the whole point of this screen.
-		for _, r := range c.Rejects {
-			fmt.Fprintf(&out, "        %s\n", warnStyle.Render("- "+r))
-		}
-	}
-	out.WriteString("\n" + dimStyle.Render("enter grabs the highlighted release, rules or no rules · esc back"))
+	out.WriteString(s.list.render(b.width, b.height-11))
+	out.WriteString("\n" + s.list.pick() + "\n")
+	out.WriteString(dimStyle.Render(rejectedToggleHint(s.list) + " · esc back"))
 	return out.String()
+}
+
+// rejectedToggleHint keeps the reject count visible without listing them.
+func rejectedToggleHint(l *candidateList) string {
+	if l.showRejected {
+		return "x hide the rejected ones"
+	}
+	if l.rejected == 0 {
+		return "everything found passed your rules"
+	}
+	return fmt.Sprintf("x show %d rejected and why", l.rejected)
 }
 
 func viewHelp() string {
@@ -248,7 +233,8 @@ func viewHelp() string {
 		{"enter", "detail, or accept a suggestion"},
 		{"enter (detail)", "open the file in " + fileManager()},
 		{"a", "add something new: type a title, pick a release"},
-		{"s", "search releases, with scores and rejection reasons"},
+		{"s", "search releases for the highlighted item"},
+		{"x (in a release list)", "show the rejected releases and why"},
 		{"d", "delete: catalog, folder and torrent"},
 		{"w", "move between watchlist and monitored"},
 		{"p", "cycle the assigned profile"},

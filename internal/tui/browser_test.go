@@ -236,11 +236,21 @@ func TestSearchViewShowsScoresAndRejections(t *testing.T) {
 	if b.mode != modeSearch {
 		t.Fatal("a finished search should open the search view")
 	}
+	// By default the screen shows what butaca would pick, not every answer
+	// every tracker gave.
 	v := b.View()
-	for _, want := range []string{"227", "REJECT", "resolution 720p not in 1080p", "272 seeders"} {
+	for _, want := range []string{"227", "272", "1 pass your rules", "enter grabs"} {
 		if !strings.Contains(v, want) {
 			t.Errorf("search view is missing %q:\n%s", want, v)
 		}
+	}
+	if strings.Contains(v, "resolution 720p not in 1080p") {
+		t.Error("rejection reasons should stay hidden until requested")
+	}
+
+	b.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
+	if v := b.View(); !strings.Contains(v, "resolution 720p not in 1080p") {
+		t.Errorf("x should reveal the rejection reasons:\n%s", v)
 	}
 }
 
@@ -250,8 +260,8 @@ func TestSearchSortsAcceptedFirst(t *testing.T) {
 		{Release: indexer.Release{Title: "accepted"}, Score: 100},
 	}
 	s := newSearchState(nil, cands)
-	if s.cands[0].Release.Title != "accepted" {
-		t.Errorf("first candidate = %q, want the accepted one", s.cands[0].Release.Title)
+	if s.list.all[0].Release.Title != "accepted" {
+		t.Errorf("first candidate = %q, want the accepted one", s.list.all[0].Release.Title)
 	}
 }
 

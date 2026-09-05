@@ -90,10 +90,24 @@ func TestAddShowsScoredReleasesWithReasons(t *testing.T) {
 	b.Update(addSearched{query: "Dune Part Two", cands: addResults()})
 
 	v := b.View()
-	for _, want := range []string{"2 releases, 1 passed the rules", "240", "REJECT", "matches reject pattern CAM", "900 seeders"} {
+	// Accepted releases only, one line each: the default view has to be
+	// readable, not a dump of every tracker's answer.
+	for _, want := range []string{"2 releases", "1 pass your rules", "240", "900"} {
 		if !strings.Contains(v, want) {
 			t.Errorf("add results are missing %q:\n%s", want, v)
 		}
+	}
+	if strings.Contains(v, "matches reject pattern CAM") {
+		t.Error("rejected releases should be hidden until asked for")
+	}
+	if !strings.Contains(v, "show 1 rejected") {
+		t.Error("the footer should offer to show the rejected ones")
+	}
+
+	// x reveals them, with the reason.
+	b.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
+	if v := b.View(); !strings.Contains(v, "matches reject pattern CAM") {
+		t.Errorf("x should reveal why a release was rejected:\n%s", v)
 	}
 }
 
@@ -103,8 +117,8 @@ func TestAddPutsAcceptedReleasesFirst(t *testing.T) {
 		{Release: indexer.Release{Title: "rejected"}, Score: 999, Rejects: []string{"no"}},
 		{Release: indexer.Release{Title: "accepted"}, Score: 10},
 	}})
-	if b.add.cands[0].Release.Title != "accepted" {
-		t.Errorf("first = %q, want the accepted release", b.add.cands[0].Release.Title)
+	if b.add.list.all[0].Release.Title != "accepted" {
+		t.Errorf("first = %q, want the accepted release", b.add.list.all[0].Release.Title)
 	}
 }
 

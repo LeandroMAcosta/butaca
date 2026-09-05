@@ -7,7 +7,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/LeandroMAcosta/butaca/internal/decide"
-	"github.com/LeandroMAcosta/butaca/internal/library"
 )
 
 // addState drives "find me something that is not in the library yet". It is
@@ -16,8 +15,7 @@ import (
 type addState struct {
 	query    string
 	searched bool
-	cands    []decide.Candidate
-	cursor   int
+	list     *candidateList
 }
 
 // addSearched carries the result of looking for an uncatalogued film.
@@ -92,19 +90,16 @@ func (b *browser) addKey(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 		b.mode = modeList
 		b.add = nil
 	case "up", "k":
-		if s.cursor > 0 {
-			s.cursor--
-		}
+		s.list.move(-1)
 	case "down", "j":
-		if s.cursor < len(s.cands)-1 {
-			s.cursor++
-		}
+		s.list.move(1)
+	case "x":
+		s.list.toggleRejected()
 	case "backspace":
 		// Back to editing the query rather than starting over.
-		s.searched, s.cands, s.cursor = false, nil, 0
+		s.searched, s.list = false, nil
 	case "enter":
-		if s.cursor < len(s.cands) {
-			c := s.cands[s.cursor]
+		if c, ok := s.list.selected(); ok {
 			b.mode = modeList
 			b.working = true
 			b.status = "adding " + c.Release.Title + "…"
@@ -139,43 +134,11 @@ func (b *browser) viewAdd() string {
 		return out.String()
 	}
 
-	accepted := 0
-	for _, c := range s.cands {
-		if c.Accepted() {
-			accepted++
-		}
-	}
-	fmt.Fprintf(&out, "%s\n\n", dimStyle.Render(fmt.Sprintf(
-		"%q — %d releases, %d passed the rules", s.query, len(s.cands), accepted)))
-
-	if len(s.cands) == 0 {
-		out.WriteString(warnStyle.Render("nothing found") + "\n\n")
-		out.WriteString(dimStyle.Render("backspace edit the title · esc cancel"))
-		return out.String()
-	}
-
-	limit := b.height - 12
-	if limit < 4 {
-		limit = 4
-	}
-	for i, c := range s.cands {
-		if i >= limit {
-			fmt.Fprintf(&out, "%s\n", dimStyle.Render(fmt.Sprintf("  … and %d more", len(s.cands)-i)))
-			break
-		}
-		mark := warnStyle.Render("REJECT")
-		if c.Accepted() {
-			mark = okStyle.Render("ok    ")
-		}
-		line := fmt.Sprintf("%s %5d  %s", mark, c.Score, truncate(c.Release.Title, b.width-24))
-		out.WriteString(cursorFor(i == s.cursor) + render(i == s.cursor, line) + "\n")
-		fmt.Fprintf(&out, "        %s\n", dimStyle.Render(fmt.Sprintf("%s · %s · %d seeders · %s",
-			orDash(c.Parsed.ScreenSize), library.HumanSize(c.Release.Size), c.Release.Seeders, c.Release.Indexer)))
-		for _, r := range c.Rejects {
-			fmt.Fprintf(&out, "        %s\n", warnStyle.Render("- "+r))
-		}
-	}
-	out.WriteString("\n" + dimStyle.Render(
-		"enter adds it and starts the download · backspace edit the title · esc cancel"))
+	out.WriteString(dimStyle.Render(s.list.summary(s.query)) + "\n")
+	out.WriteString(dimStyle.Render("Ordered by butaca's score: the top one is what it would pick.") + "\n\n")
+	out.WriteString(s.list.render(b.width, b.height-13))
+	out.WriteString("\n" + s.list.pick() + "\n")
+	out.WriteString(dimStyle.Render(
+		rejectedToggleHint(s.list) + " · backspace edit the title · esc cancel"))
 	return out.String()
 }
