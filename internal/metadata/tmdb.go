@@ -17,12 +17,16 @@ import (
 var ErrNoAPIKey = errors.New("no TMDB API key configured")
 
 type Movie struct {
-	TMDBID           int64  `json:"id"`
-	Title            string `json:"title"`
-	OriginalTitle    string `json:"original_title"`
-	OriginalLanguage string `json:"original_language"`
-	ReleaseDate      string `json:"release_date"`
-	Overview         string `json:"overview"`
+	TMDBID           int64   `json:"id"`
+	Title            string  `json:"title"`
+	OriginalTitle    string  `json:"original_title"`
+	OriginalLanguage string  `json:"original_language"`
+	ReleaseDate      string  `json:"release_date"`
+	Overview         string  `json:"overview"`
+	VoteAverage      float64 `json:"vote_average"`
+	VoteCount        int     `json:"vote_count"`
+	Popularity       float64 `json:"popularity"`
+	GenreIDs         []int   `json:"genre_ids"`
 }
 
 // Titles returns every name the film is released under, most common first.

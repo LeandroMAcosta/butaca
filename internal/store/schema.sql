@@ -1,6 +1,25 @@
 PRAGMA journal_mode = WAL;
 PRAGMA foreign_keys = ON;
 
+-- A profile is a person, not a quality preset: their release preferences, their
+-- Letterboxd account, and (through items.profile_id) their own watchlist. An
+-- item without a profile falls back to the config defaults, so a fresh install
+-- needs no profiles at all.
+CREATE TABLE IF NOT EXISTS profiles (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    name            TEXT    NOT NULL UNIQUE,
+    letterboxd_user TEXT,
+    resolutions     TEXT,
+    sources         TEXT,
+    min_size        TEXT,
+    max_size        TEXT,
+    min_seeders     INTEGER NOT NULL DEFAULT 0,
+    language_mode   TEXT    NOT NULL DEFAULT 'original',
+    prefer_language TEXT,
+    subtitle_langs  TEXT,
+    is_default      INTEGER NOT NULL DEFAULT 0
+);
+
 -- One table for movies and series. kind discriminates; the import path is shared.
 CREATE TABLE IF NOT EXISTS items (
     id                INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -13,6 +32,12 @@ CREATE TABLE IF NOT EXISTS items (
     alt_titles        TEXT,
     path              TEXT,
     monitored         INTEGER NOT NULL DEFAULT 1,
+    -- state separates "go get this" from "some day": watchlist entries are
+    -- catalogued but never searched until promoted.
+    state             TEXT    NOT NULL DEFAULT 'monitored',
+    profile_id        INTEGER REFERENCES profiles(id) ON DELETE SET NULL,
+    rating            REAL,
+    source            TEXT,
     added_at          TEXT    NOT NULL DEFAULT (datetime('now')),
     UNIQUE (kind, tmdb_id)
 );
@@ -83,6 +108,28 @@ CREATE TABLE IF NOT EXISTS history (
     at      TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Audio and subtitle tracks found inside a file, so the library can answer
+-- "which languages do I actually have?" without re-probing every time.
+CREATE TABLE IF NOT EXISTS tracks (
+    id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+    kind    TEXT    NOT NULL CHECK (kind IN ('audio','subtitle')),
+    lang    TEXT    NOT NULL,
+    title   TEXT,
+    UNIQUE (file_id, kind, lang, title)
+);
+
 CREATE INDEX IF NOT EXISTS idx_files_item   ON files(item_id);
+CREATE INDEX IF NOT EXISTS idx_tracks_file  ON tracks(file_id);
+
+-- Resolving a Letterboxd slug to a TMDB id costs one request and never
+-- changes, so it is cached permanently.
+CREATE TABLE IF NOT EXISTS letterboxd_films (
+    slug     TEXT PRIMARY KEY,
+    tmdb_id  INTEGER,
+    title    TEXT,
+    year     INTEGER,
+    fetched_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 CREATE INDEX IF NOT EXISTS idx_queue_state  ON queue(state);
 CREATE INDEX IF NOT EXISTS idx_history_item ON history(item_id);

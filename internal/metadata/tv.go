@@ -122,3 +122,29 @@ func (c *Client) getJSON(ctx context.Context, u string, out any) error {
 	}
 	return json.NewDecoder(resp.Body).Decode(out)
 }
+
+// Recommendations and Similar are TMDB's two flavours of "you might also like":
+// recommendations are behavioural, similar is metadata-driven. Combining them
+// gives better coverage than either alone.
+func (c *Client) Recommendations(ctx context.Context, tmdbID int64) ([]Movie, error) {
+	return c.relatedMovies(ctx, tmdbID, "recommendations")
+}
+
+func (c *Client) Similar(ctx context.Context, tmdbID int64) ([]Movie, error) {
+	return c.relatedMovies(ctx, tmdbID, "similar")
+}
+
+func (c *Client) relatedMovies(ctx context.Context, tmdbID int64, kind string) ([]Movie, error) {
+	if !c.Enabled() {
+		return nil, ErrNoAPIKey
+	}
+	q := url.Values{"api_key": {c.apiKey}}
+	var body struct {
+		Results []Movie `json:"results"`
+	}
+	u := fmt.Sprintf("https://api.themoviedb.org/3/movie/%d/%s?%s", tmdbID, kind, q.Encode())
+	if err := c.getJSON(ctx, u, &body); err != nil {
+		return nil, err
+	}
+	return body.Results, nil
+}

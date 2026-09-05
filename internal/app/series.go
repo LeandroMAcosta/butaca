@@ -72,7 +72,11 @@ func (a *App) AddSeries(ctx context.Context, title string, opt AddOptions) (*sto
 // release group uses.
 func (a *App) SearchEpisode(ctx context.Context, it *store.Item, season, episode int) ([]decide.Candidate, error) {
 	query := fmt.Sprintf("%s S%02dE%02d", it.Title, season, episode)
-	cands, err := a.SearchFor(ctx, ItemFor(it), query)
+	rules, err := a.RulesFor(it)
+	if err != nil {
+		return nil, err
+	}
+	cands, err := a.SearchFor(ctx, ItemFor(it), query, rules)
 	if err != nil {
 		return nil, err
 	}

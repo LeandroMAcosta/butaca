@@ -72,7 +72,11 @@ func (a *App) SearchItem(ctx context.Context, it *store.Item) ([]decide.Candidat
 	if it.Year > 0 {
 		query = fmt.Sprintf("%s %d", it.Title, it.Year)
 	}
-	return a.SearchFor(ctx, ItemFor(it), query)
+	rules, err := a.RulesFor(it)
+	if err != nil {
+		return nil, err
+	}
+	return a.SearchFor(ctx, ItemFor(it), query, rules)
 }
 
 // ImportReady scans the queue, imports everything qBittorrent has finished, and
@@ -146,13 +150,19 @@ func (a *App) importOne(it *store.Item, contentPath string, episodeID *int64) (s
 		}
 	}
 
-	if _, err := a.Store.AddFile(&store.File{
+	fileID, err := a.Store.AddFile(&store.File{
 		ItemID:    it.ID,
 		EpisodeID: episodeID,
 		Path:      res.Destination,
 		Size:      res.Size,
-	}); err != nil {
+	})
+	if err != nil {
 		return "", err
+	}
+	// Probe now, while the file is fresh: knowing its audio and subtitle
+	// languages is what lets the library answer "do I have this in Spanish?".
+	if _, err := a.ProbeFile(context.Background(), &store.File{ID: fileID, Path: res.Destination}); err != nil {
+		_ = a.Store.Log(it.ID, "probe_failed", err.Error())
 	}
 	_ = a.Store.Log(it.ID, "imported", res.Destination)
 
@@ -172,36 +182,4 @@ func (a *App) fetchSubtitles(videoPath string) (int, error) {
 		return 0, err
 	}
 	return len(res.Downloaded), nil
-}
-
-// RemoveMovie tears down every reference: the library folder, the torrent and
-// its payload, and the catalog row. Missing one frees no disk, because the
-// library entry and the download are hardlinks to the same bytes.
-func (a *App) RemoveMovie(ctx context.Context, it *store.Item, deleteFiles bool) ([]string, error) {
-	var steps []string
-
-	if deleteFiles && it.Path != "" {
-		if err := library.RemoveFolder(it.Path); err != nil {
-			return steps, fmt.Errorf("remove %s: %w", it.Path, err)
-		}
-		steps = append(steps, "removed "+it.Path)
-	}
-
-	pending, _ := a.Store.PendingQueue()
-	for _, q := range pending {
-		if q.ItemID != it.ID {
-			continue
-		}
-		if err := a.QBit.Delete(ctx, q.InfoHash, deleteFiles); err != nil {
-			steps = append(steps, "qbittorrent: "+err.Error())
-		} else {
-			steps = append(steps, "removed torrent "+q.InfoHash[:min(8, len(q.InfoHash))])
-		}
-	}
-
-	if err := a.Store.DeleteItem(it.ID); err != nil {
-		return steps, err
-	}
-	steps = append(steps, "removed from catalog")
-	return steps, nil
 }

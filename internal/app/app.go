@@ -4,6 +4,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -42,6 +43,80 @@ func New(cfg *config.Config) (*App, error) {
 }
 
 func (a *App) Close() error { return a.Store.Close() }
+
+// RulesFor resolves the rules for one item: its profile when it has one, the
+// default profile when there is one, and the global config underneath. A
+// profile only overrides the fields it actually sets, so "1080p only" does not
+// silently reset every other preference.
+func (a *App) RulesFor(it *store.Item) (decide.Rules, error) {
+	rules, err := a.Rules()
+	if err != nil {
+		return rules, err
+	}
+	prof, err := a.profileFor(it)
+	if err != nil || prof == nil {
+		return rules, err
+	}
+	return applyProfile(rules, prof)
+}
+
+func (a *App) profileFor(it *store.Item) (*store.Profile, error) {
+	if it != nil && it.ProfileID > 0 {
+		p, err := a.Store.GetProfile(it.ProfileID)
+		if err == nil {
+			return p, nil
+		}
+		if !errors.Is(err, store.ErrNotFound) {
+			return nil, err
+		}
+	}
+	return a.Store.DefaultProfile()
+}
+
+func applyProfile(r decide.Rules, p *store.Profile) (decide.Rules, error) {
+	if len(p.Resolutions) > 0 {
+		r.Resolutions = p.Resolutions
+	}
+	if len(p.Sources) > 0 {
+		r.Sources = p.Sources
+	}
+	if p.MinSeeders > 0 {
+		r.MinSeeders = p.MinSeeders
+	}
+	if p.MinSize != "" {
+		v, err := decide.ParseSize(p.MinSize)
+		if err != nil {
+			return r, fmt.Errorf("profile %s: min_size: %w", p.Name, err)
+		}
+		r.MinSize = v
+	}
+	if p.MaxSize != "" {
+		v, err := decide.ParseSize(p.MaxSize)
+		if err != nil {
+			return r, fmt.Errorf("profile %s: max_size: %w", p.Name, err)
+		}
+		r.MaxSize = v
+	}
+	if p.LanguageMode != "" {
+		mode, err := decide.ParseLanguageMode(p.LanguageMode)
+		if err != nil {
+			return r, fmt.Errorf("profile %s: %w", p.Name, err)
+		}
+		r.LanguageMode = mode
+	}
+	if p.PreferLanguage != "" {
+		r.PreferLanguage = p.PreferLanguage
+	}
+	return r, nil
+}
+
+// SubtitleLangsFor returns the subtitle languages that apply to an item.
+func (a *App) SubtitleLangsFor(it *store.Item) []string {
+	if prof, err := a.profileFor(it); err == nil && prof != nil && len(prof.SubtitleLangs) > 0 {
+		return prof.SubtitleLangs
+	}
+	return a.Cfg.Subtitles.Languages
+}
 
 // Rules converts the config into engine rules, resolving sizes and mode.
 func (a *App) Rules() (decide.Rules, error) {
@@ -114,8 +189,9 @@ func (a *App) Health(ctx context.Context) Health {
 }
 
 // SearchFor runs a Prowlarr search, parses every result through the sidecar and
-// scores them. Rejected candidates are kept so callers can explain themselves.
-func (a *App) SearchFor(ctx context.Context, item decide.Item, query string) ([]decide.Candidate, error) {
+// scores them against rules. Rejected candidates are kept so callers can
+// explain themselves.
+func (a *App) SearchFor(ctx context.Context, item decide.Item, query string, rules decide.Rules) ([]decide.Candidate, error) {
 	releases, err := a.Prowlarr.Search(ctx, query)
 	if err != nil {
 		return nil, err
@@ -133,10 +209,6 @@ func (a *App) SearchFor(ctx context.Context, item decide.Item, query string) ([]
 		return nil, err
 	}
 
-	rules, err := a.Rules()
-	if err != nil {
-		return nil, err
-	}
 	return decide.Evaluate(releases, parsed, item, rules), nil
 }
 

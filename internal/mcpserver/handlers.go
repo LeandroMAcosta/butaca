@@ -199,11 +199,15 @@ func (s *Server) handleRemove(ctx context.Context, req mcp.CallToolRequest) (*mc
 	if err != nil {
 		return fail(err), nil
 	}
-	steps, err := s.app.RemoveMovie(ctx, it, !req.GetBool("keep_files", false))
-	if err != nil {
-		return lines("removing "+it.Title+" failed partway:", append(steps, err.Error()), err.Error()), nil
+	steps, err := s.app.Remove(ctx, it, app.RemoveOptions{KeepFiles: req.GetBool("keep_files", false)})
+	out := make([]string, 0, len(steps))
+	for _, st := range steps {
+		out = append(out, st.String())
 	}
-	return lines("removed "+it.Title, steps, "removed "+it.Title), nil
+	if err != nil {
+		return lines("removing "+it.Title+" failed partway:", out, err.Error()), nil
+	}
+	return lines("removed "+it.Title, out, "removed "+it.Title), nil
 }
 
 func (s *Server) handleStatus(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {

@@ -102,3 +102,25 @@ func (c *Client) Health(ctx context.Context) error {
 	}
 	return nil
 }
+
+// Track is one audio or subtitle stream inside a media file.
+type Track struct {
+	Kind  string `json:"kind"` // audio | subtitle
+	Lang  string `json:"lang"`
+	Title string `json:"title"`
+}
+
+type TracksResult struct {
+	Tracks []Track `json:"tracks"`
+}
+
+// Tracks probes a file for its audio and subtitle streams. The sidecar shells
+// out to ffprobe, which is the only reliable way to know what a container
+// actually holds -- the release name routinely lies or says nothing.
+func (c *Client) Tracks(ctx context.Context, path string) ([]Track, error) {
+	var out TracksResult
+	if err := c.post(ctx, "/tracks", map[string]any{"path": path}, &out); err != nil {
+		return nil, err
+	}
+	return out.Tracks, nil
+}

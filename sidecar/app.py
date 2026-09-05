@@ -5,6 +5,9 @@ that are not worth porting: guessit (release-name parsing) and subliminal
 (subtitle search). Kept deliberately small.
 """
 
+import json
+import shutil
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -115,3 +118,57 @@ def subtitles(req: SubtitleRequest) -> SubtitleResult:
     got = {s.language.alpha2 for s in saved}
     skipped = [c for c in req.languages if c not in got]
     return SubtitleResult(downloaded=downloaded, skipped=skipped)
+
+
+class TracksRequest(BaseModel):
+    path: str
+
+
+class Track(BaseModel):
+    kind: str  # audio | subtitle
+    lang: str
+    title: str | None = None
+
+
+class TracksResult(BaseModel):
+    tracks: list[Track] = Field(default_factory=list)
+
+
+@app.post("/tracks", response_model=TracksResult)
+def tracks(req: TracksRequest) -> TracksResult:
+    """Report the audio and subtitle streams inside a media file.
+
+    Answers "which languages do I actually have?" -- a question neither the
+    release name nor the catalog can answer, because a single file can carry
+    ten audio tracks and forty subtitle tracks.
+    """
+    video = Path(req.path)
+    if not video.is_file():
+        raise HTTPException(status_code=404, detail=f"no such file: {req.path}")
+
+    ffprobe = shutil.which("ffprobe")
+    if not ffprobe:
+        raise HTTPException(status_code=501, detail="ffprobe is not installed in this image")
+
+    try:
+        out = subprocess.run(
+            [ffprobe, "-v", "error", "-show_entries",
+             "stream=index,codec_type:stream_tags=language,title",
+             "-of", "json", str(video)],
+            capture_output=True, text=True, timeout=120, check=True,
+        ).stdout
+    except subprocess.CalledProcessError as exc:
+        raise HTTPException(status_code=422, detail=f"ffprobe failed: {exc.stderr[:200]}") from exc
+    except subprocess.TimeoutExpired as exc:
+        raise HTTPException(status_code=504, detail="ffprobe timed out") from exc
+
+    found: list[Track] = []
+    for stream in json.loads(out).get("streams", []):
+        kind = stream.get("codec_type")
+        if kind not in ("audio", "subtitle"):
+            continue
+        tags = stream.get("tags") or {}
+        # An untagged stream is common in older rips; "und" keeps it countable
+        # instead of silently dropping a track that exists.
+        found.append(Track(kind=kind, lang=tags.get("language") or "und", title=tags.get("title")))
+    return TracksResult(tracks=found)

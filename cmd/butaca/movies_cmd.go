@@ -198,7 +198,7 @@ func newRemoveCmd() *cobra.Command {
 				if err != nil {
 					return err
 				}
-				steps, err := a.RemoveMovie(ctx, it, !keepFiles)
+				steps, err := a.Remove(ctx, it, app.RemoveOptions{KeepFiles: keepFiles})
 				for _, s := range steps {
 					fmt.Println(" ", s)
 				}

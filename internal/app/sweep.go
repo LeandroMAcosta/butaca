@@ -29,7 +29,9 @@ func (a *App) SearchMissing(ctx context.Context) ([]string, error) {
 
 	var out []string
 	for _, it := range items {
-		if !it.Monitored {
+		// Watchlist entries are catalogued on purpose but never searched: that
+		// is what stops a Letterboxd import from starting hundreds of downloads.
+		if !it.Monitored || it.State == store.StateWatchlist || it.State == store.StateUnmonitored {
 			continue
 		}
 		if it.Kind == "series" {

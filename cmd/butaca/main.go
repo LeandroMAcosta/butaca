@@ -57,6 +57,15 @@ func main() {
 		newServeCmd(),
 		newMCPCmd(),
 		newTUICmd(),
+		newScanTracksCmd(),
+		newLanguagesCmd(),
+		newDiskCmd(),
+		newLetterboxdCmd(),
+		newWatchlistCmd(),
+		newWatchCmd(),
+		newUnwatchCmd(),
+		newProfileCmd(),
+		newRecommendCmd(),
 	)
 
 	if err := root.Execute(); err != nil {
