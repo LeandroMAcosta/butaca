@@ -89,6 +89,8 @@ func (s *Server) register() {
 	s.mcp.AddTool(mcp.NewTool("import",
 		mcp.WithDescription("Import downloads that have finished but are not in the library yet."),
 	), s.handleImport)
+
+	s.registerExtras()
 }
 
 func text(format string, args ...any) *mcp.CallToolResult {
@@ -115,4 +117,55 @@ func lines(header string, items []string, empty string) *mcp.CallToolResult {
 		b.WriteString("\n")
 	}
 	return mcp.NewToolResultText(strings.TrimRight(b.String(), "\n"))
+}
+
+// registerExtras adds the tools that came with profiles, the watchlist and
+// recommendations.
+func (s *Server) registerExtras() {
+	s.mcp.AddTool(mcp.NewTool("watchlist",
+		mcp.WithDescription(
+			"Show the films queued for some day. Watchlist entries are catalogued but "+
+				"never searched until promoted, which is what stops a bulk import from "+
+				"starting hundreds of downloads."),
+	), s.handleWatchlist)
+
+	s.mcp.AddTool(mcp.NewTool("watch",
+		mcp.WithDescription("Promote a watchlist entry so butaca searches for it, or push one back."),
+		mcp.WithString("item", mcp.Required(), mcp.Description("Catalog id or part of the title")),
+		mcp.WithBoolean("monitor", mcp.Description("true promotes it, false returns it to the watchlist (default true)")),
+		mcp.WithBoolean("search", mcp.Description("Search immediately after promoting")),
+	), s.handleWatch)
+
+	s.mcp.AddTool(mcp.NewTool("recommend",
+		mcp.WithDescription(
+			"Suggest films from what the library already holds, via TMDB. Needs a TMDB API key. "+
+				"Never suggests something already in the catalog."),
+		mcp.WithNumber("limit", mcp.Description("How many suggestions (default 20)")),
+		mcp.WithNumber("add", mcp.Description("Add suggestion N to the watchlist")),
+	), s.handleRecommend)
+
+	s.mcp.AddTool(mcp.NewTool("languages",
+		mcp.WithDescription(
+			"Report which audio and subtitle languages the library actually holds, read "+
+				"from the media files themselves rather than their names."),
+		mcp.WithString("item", mcp.Description("Catalog id or part of a title; omit for the whole library")),
+	), s.handleLanguages)
+
+	s.mcp.AddTool(mcp.NewTool("disk",
+		mcp.WithDescription("Free space on the media volume and how much the library occupies."),
+	), s.handleDisk)
+
+	s.mcp.AddTool(mcp.NewTool("profiles",
+		mcp.WithDescription(
+			"List the profiles: each is a person's release preferences, subtitle languages "+
+				"and Letterboxd account."),
+	), s.handleProfiles)
+
+	s.mcp.AddTool(mcp.NewTool("letterboxd_import",
+		mcp.WithDescription(
+			"Import a Letterboxd member's public watchlist into butaca's watchlist. "+
+				"Nothing is downloaded: imports land on the watchlist."),
+		mcp.WithString("user", mcp.Description("Letterboxd username; omit to use the default profile's")),
+		mcp.WithBoolean("dry_run", mcp.Description("Report what would be imported without writing")),
+	), s.handleLetterboxd)
 }

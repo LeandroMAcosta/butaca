@@ -5,7 +5,8 @@ Bazarr with a single service; keeps Prowlarr (indexer aggregation) and
 qBittorrent (downloading), because those two are worth delegating to.
 
 Movies and series, a decision engine you can actually express your taste in,
-subtitles, a CLI, a TUI, an MCP server, and a background service.
+subtitles, profiles, a watchlist, Letterboxd import, recommendations, a CLI, a
+TUI, an MCP server, and a background service.
 
 ## Why
 
@@ -108,7 +109,7 @@ disk space.
 ## Usage
 
 ```sh
-butaca tui                                  # browse the catalog and queue
+butaca tui                                  # five tabs: library, watchlist, queue, discover, profiles
 butaca add "Taxi Driver" --year 1976        # add and search
 butaca add "Severance" --series             # series need a TMDB key
 butaca add "Amélie" --lang fr --alt-title "Le Fabuleux Destin d'Amélie Poulain"
@@ -161,6 +162,73 @@ subtitles:
 `butaca status` reports whether `downloads` and `movies` actually share a
 filesystem. If they do not, imports fail loudly rather than silently copying and
 doubling disk usage.
+
+## Profiles
+
+A profile is a person, not a quality preset: their release preferences, their
+subtitle languages, their Letterboxd account and their own watchlist.
+
+```sh
+butaca profile set Leandro --letterboxd leandroacosta \
+  --language-mode original --subtitles es --resolutions 1080p --default
+butaca profile set Casa --language-mode prefer --prefer-language es \
+  --resolutions 1080p,720p
+butaca profile assign Casa "Toy Story 5"
+```
+
+A profile overrides only the fields it sets; everything else falls back to the
+global configuration.
+
+## Watchlist
+
+```sh
+butaca watchlist              # films queued for some day
+butaca watch "Vivarium"       # promote it so butaca searches for it
+butaca unwatch "Toy Story 5"  # stop searching, keep the files
+```
+
+Watchlist entries are catalogued but **never searched**. That separation is what
+lets a two-hundred-film import stay an intention instead of two hundred
+downloads.
+
+## Letterboxd
+
+```sh
+butaca letterboxd lists --user yourname
+butaca letterboxd import --user yourname --list pelis-para-ver
+```
+
+Letterboxd has no public API. The member RSS feed carries lists but omits TMDB
+ids, and the watchlist and ratings feeds answer 403, so this reads the public
+HTML pages and resolves each film through `/film/{slug}/`, where the TMDB id
+lives. It is a scraper, isolated in `internal/letterboxd` so that when the
+markup changes one package fails loudly. Imports land on the watchlist and
+download nothing.
+
+## Recommendations
+
+```sh
+butaca recommend --limit 20
+butaca recommend --add 3        # put suggestion 3 on the watchlist
+```
+
+Seeded by the films you actually own, not by Letterboxd ratings: a library
+always has something to reason from, whereas an account with no rated films
+produces nothing. Needs a TMDB API key. A film reached from several of your
+titles outranks one reached from a single popular seed, and nothing already in
+the catalog is ever suggested back.
+
+## Languages
+
+```sh
+butaca scan-tracks     # probe every file with ffprobe
+butaca languages       # what the library actually holds
+butaca disk            # free space and what the library occupies
+```
+
+Track data comes from the files themselves, not their names. One release here
+carries 10 audio and 44 subtitle tracks, which is why lists show `es fr en +7`
+and the detail view shows all of them.
 
 ## Series
 

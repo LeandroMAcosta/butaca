@@ -12,12 +12,11 @@ import (
 )
 
 var (
-	titleStyle  = lipgloss.NewStyle().Bold(true)
-	helpStyle   = lipgloss.NewStyle().Faint(true)
-	cursorStyle = lipgloss.NewStyle().Bold(true)
-	chosenStyle = lipgloss.NewStyle().Bold(true)
+	helpStyle   = dimStyle
+	cursorStyle = labelStyle
+	chosenStyle = labelStyle
 	footerStyle = lipgloss.NewStyle().Faint(true).MarginTop(1)
-	errStyle    = lipgloss.NewStyle().Bold(true)
+	errStyle    = warnStyle
 )
 
 type model struct {
