@@ -119,7 +119,9 @@ func (b *browser) handleKey(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return b.searchKey(k)
 	case modeConfirm:
 		return b.confirmKey(k)
-	case modeDetail, modeHelp:
+	case modeDetail:
+		return b.detailKey(k)
+	case modeHelp:
 		switch k.String() {
 		case "q", "esc", "enter", "?":
 			b.mode = modeList

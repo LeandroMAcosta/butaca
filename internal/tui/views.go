@@ -243,6 +243,7 @@ func viewHelp() string {
 		{"tab / 1-5", "switch tab"},
 		{"/", "filter by title (esc clears)"},
 		{"enter", "detail, or accept a suggestion"},
+		{"enter (detail)", "open the file in " + fileManager()},
 		{"s", "search releases, with scores and rejection reasons"},
 		{"d", "delete: catalog, folder and torrent"},
 		{"w", "move between watchlist and monitored"},

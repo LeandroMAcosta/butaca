@@ -53,7 +53,7 @@ func (b *browser) viewDetail() string {
 		fmt.Fprintf(&s, "%s %s\n", labelStyle.Render("subtitles"), wrapLangs(d.langs.Subtitles, b.width-12))
 	}
 
-	s.WriteString("\n" + dimStyle.Render("esc back"))
+	s.WriteString("\n" + dimStyle.Render("enter open in "+fileManager()+" · esc back"))
 	return s.String()
 }
 
@@ -184,4 +184,21 @@ func sortCandidates(cands []decide.Candidate) {
 			cands[j-1], cands[j] = cands[j], cands[j-1]
 		}
 	}
+}
+
+// detailKey handles the detail view. Enter reveals the item on disk rather than
+// closing the view: once you are looking at a film's files, opening them is the
+// obvious next step, and escape already goes back.
+func (b *browser) detailKey(k tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch k.String() {
+	case "enter", "o":
+		if b.detail == nil {
+			return b, nil
+		}
+		path, isFile := b.detail.revealTarget()
+		return b, reveal(path, isFile)
+	case "esc", "q", "?":
+		b.mode = modeList
+	}
+	return b, nil
 }
