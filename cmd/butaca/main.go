@@ -54,6 +54,9 @@ func main() {
 		newMigrateCmd(),
 		newOrphansCmd(),
 		newSetupCmd(),
+		newServeCmd(),
+		newMCPCmd(),
+		newTUICmd(),
 	)
 
 	if err := root.Execute(); err != nil {

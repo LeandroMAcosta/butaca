@@ -4,10 +4,8 @@ One catalog for movies, series and subtitles. Replaces Radarr, Sonarr and
 Bazarr with a single service; keeps Prowlarr (indexer aggregation) and
 qBittorrent (downloading), because those two are worth delegating to.
 
-**Status: M1.** Movies work end to end — add, search, decide, grab, import,
-subtitles — plus migration from an existing Radarr catalog and a first-run
-setup wizard. Series (M4), the MCP server (M3) and the full TUI (M5) are not
-built yet.
+Movies and series, a decision engine you can actually express your taste in,
+subtitles, a CLI, a TUI, an MCP server, and a background service.
 
 ## Why
 
@@ -87,10 +85,32 @@ safe to run while the old stack is still installed. Radarr stores the original
 language as an integer in its own enum, which `migrate` maps back to ISO codes
 so `language_mode: original` keeps working for the imported films.
 
+## Running it as a service
+
+```sh
+butaca serve            # import every minute, search every 6h, subtitles every 12h
+butaca serve --search-interval 0    # disable a job
+```
+
+Each job has its own ticker, so a slow search never delays an import.
+
+## Driving it from Claude
+
+```sh
+claude mcp add butaca -- /path/to/butaca mcp
+```
+
+Eight tools: `list`, `add`, `search`, `grab`, `remove`, `status`, `subtitles`,
+`import`. `remove` is one call that clears the catalog row, the library folder
+and the torrent together — with hardlinks, doing only one of the three frees no
+disk space.
+
 ## Usage
 
 ```sh
+butaca tui                                  # browse the catalog and queue
 butaca add "Taxi Driver" --year 1976        # add and search
+butaca add "Severance" --series             # series need a TMDB key
 butaca add "Amélie" --lang fr --alt-title "Le Fabuleux Destin d'Amélie Poulain"
 butaca search Amélie --explain              # every release, scored, with reasons
 butaca search Amélie --grab                 # send the winner to qBittorrent

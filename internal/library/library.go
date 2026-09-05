@@ -199,3 +199,44 @@ func RemoveFolder(dir string) error {
 	}
 	return os.RemoveAll(dir)
 }
+
+// EpisodeDestination builds the conventional layout for a series file:
+//
+//	Series (Year)/Season 01/Series (Year) - S01E02 - Episode Title.mkv
+//
+// Every media player and scraper understands this shape.
+func EpisodeDestination(destRoot, series string, year, season, episode int, epTitle, ext string) string {
+	folder := MovieFolder(series, year)
+	name := fmt.Sprintf("%s - S%02dE%02d", folder, season, episode)
+	if t := sanitize(epTitle); t != "" {
+		name += " - " + t
+	}
+	return filepath.Join(destRoot, folder, fmt.Sprintf("Season %02d", season), name+strings.ToLower(ext))
+}
+
+// ImportEpisode links src to the standard series location.
+func ImportEpisode(src, destRoot, series string, year, season, episode int, epTitle string) (*ImportResult, error) {
+	fi, err := os.Stat(src)
+	if err != nil {
+		return nil, err
+	}
+	dest := EpisodeDestination(destRoot, series, year, season, episode, epTitle, filepath.Ext(src))
+	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
+		return nil, err
+	}
+	if existing, err := os.Stat(dest); err == nil {
+		if os.SameFile(fi, existing) {
+			return &ImportResult{Source: src, Destination: dest, Size: fi.Size(), Hardlinked: true}, nil
+		}
+		return nil, fmt.Errorf("destination already exists: %s", dest)
+	}
+	if err := os.Link(src, dest); err != nil {
+		if isCrossDevice(err) {
+			return nil, fmt.Errorf(
+				"cannot hardlink %s -> %s: they are on different filesystems. "+
+					"Point paths.downloads and paths.tv at the same volume", src, dest)
+		}
+		return nil, fmt.Errorf("link %s -> %s: %w", src, dest, err)
+	}
+	return &ImportResult{Source: src, Destination: dest, Size: fi.Size(), Hardlinked: true}, nil
+}

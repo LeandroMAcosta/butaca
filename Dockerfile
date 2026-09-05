@@ -13,4 +13,4 @@ USER butaca
 ENV BUTACA_DATA_DIR=/data
 VOLUME ["/data"]
 ENTRYPOINT ["butaca"]
-CMD ["import", "--watch"]
+CMD ["serve"]

@@ -110,7 +110,7 @@ func (a *App) ImportReady(ctx context.Context) ([]string, error) {
 		if err != nil {
 			continue
 		}
-		line, err := a.importOne(it, t.ContentPath)
+		line, err := a.importOne(it, t.ContentPath, q.EpisodeID)
 		if err != nil {
 			_ = a.Store.SetQueueState(q.InfoHash, "failed", t.Progress)
 			_ = a.Store.Log(it.ID, "import_failed", err.Error())
@@ -123,19 +123,34 @@ func (a *App) ImportReady(ctx context.Context) ([]string, error) {
 	return done, nil
 }
 
-func (a *App) importOne(it *store.Item, contentPath string) (string, error) {
+func (a *App) importOne(it *store.Item, contentPath string, episodeID *int64) (string, error) {
 	video, err := library.FindVideo(contentPath)
 	if err != nil {
 		return "", err
 	}
-	res, err := library.ImportMovie(video, a.Cfg.Paths.Movies, it.Title, it.Year)
-	if err != nil {
-		return "", err
+
+	var res *library.ImportResult
+	if episodeID != nil {
+		ep, err := a.Store.EpisodeByID(*episodeID)
+		if err != nil {
+			return "", err
+		}
+		res, err = library.ImportEpisode(video, a.Cfg.Paths.TV, it.Title, it.Year, ep.Season, ep.Number, ep.Title)
+		if err != nil {
+			return "", err
+		}
+	} else {
+		res, err = library.ImportMovie(video, a.Cfg.Paths.Movies, it.Title, it.Year)
+		if err != nil {
+			return "", err
+		}
 	}
+
 	if _, err := a.Store.AddFile(&store.File{
-		ItemID: it.ID,
-		Path:   res.Destination,
-		Size:   res.Size,
+		ItemID:    it.ID,
+		EpisodeID: episodeID,
+		Path:      res.Destination,
+		Size:      res.Size,
 	}); err != nil {
 		return "", err
 	}

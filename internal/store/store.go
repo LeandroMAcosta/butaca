@@ -81,6 +81,7 @@ type File struct {
 type QueueEntry struct {
 	ID           int64
 	ItemID       int64
+	EpisodeID    *int64
 	ReleaseTitle string
 	Magnet       string
 	InfoHash     string
@@ -243,46 +244,14 @@ func (s *Store) FilesForItem(itemID int64) ([]*File, error) {
 	return out, rows.Err()
 }
 
-func (s *Store) Enqueue(q *QueueEntry) error {
-	_, err := s.db.Exec(`
-        INSERT INTO queue (item_id, release_title, magnet, info_hash, state, size)
-        VALUES (?,?,?,?,?,?)
-        ON CONFLICT(info_hash) DO UPDATE SET state=excluded.state`,
-		q.ItemID, q.ReleaseTitle, q.Magnet, q.InfoHash, q.State, q.Size)
-	return err
-}
-
-func (s *Store) PendingQueue() ([]*QueueEntry, error) {
-	rows, err := s.db.Query(`
-		SELECT id, item_id, release_title, COALESCE(magnet,''), info_hash, state, size, progress
-		FROM queue WHERE state NOT IN ('imported','failed')`)
+func (s *Store) AddSubtitle(fileID int64, lang, path string) (int64, error) {
+	res, err := s.db.Exec(`
+        INSERT INTO subtitles (file_id, lang, path) VALUES (?,?,?)
+        ON CONFLICT(file_id, lang) DO UPDATE SET path=excluded.path`, fileID, lang, path)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
-	defer rows.Close()
-	var out []*QueueEntry
-	for rows.Next() {
-		var q QueueEntry
-		if err := rows.Scan(&q.ID, &q.ItemID, &q.ReleaseTitle, &q.Magnet, &q.InfoHash, &q.State, &q.Size, &q.Progress); err != nil {
-			return nil, err
-		}
-		out = append(out, &q)
-	}
-	return out, rows.Err()
-}
-
-func (s *Store) SetQueueState(infoHash, state string, progress float64) error {
-	_, err := s.db.Exec(`UPDATE queue SET state=?, progress=? WHERE info_hash=?`, state, progress, infoHash)
-	return err
-}
-
-func (s *Store) Log(itemID int64, event, detail string) error {
-	var id any
-	if itemID > 0 {
-		id = itemID
-	}
-	_, err := s.db.Exec(`INSERT INTO history (item_id, event, detail) VALUES (?,?,?)`, id, event, detail)
-	return err
+	return res.LastInsertId()
 }
 
 func boolInt(b bool) int {

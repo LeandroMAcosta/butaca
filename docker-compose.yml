@@ -21,6 +21,7 @@ services:
     volumes:
       - butaca-data:/data
       - media:/media
+    command: ["serve"]
     restart: unless-stopped
 
   butaca-parse:

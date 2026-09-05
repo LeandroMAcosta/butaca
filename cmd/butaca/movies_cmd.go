@@ -18,18 +18,35 @@ import (
 
 func newAddCmd() *cobra.Command {
 	var opt app.AddOptions
-	var noSearch bool
+	var noSearch, series bool
 
 	cmd := &cobra.Command{
 		Use:   "add <title>",
-		Short: "Add a movie and search for it",
+		Short: "Add a movie or series and search for it",
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			title := strings.Join(args, " ")
 			opt.Monitored = true
 			return withApp(func(ctx context.Context, a *app.App) error {
-				it, err := a.AddMovie(ctx, title, opt)
+				add := a.AddMovie
+				if series {
+					add = a.AddSeries
+				}
+				it, err := add(ctx, title, opt)
 				if err != nil {
+					return err
+				}
+				if series {
+					eps, _ := a.Store.EpisodesForItem(it.ID)
+					fmt.Printf("added #%d  %s (%d)  series, %d episodes  original language: %s\n",
+						it.ID, it.Title, it.Year, len(eps), orDash(it.OriginalLanguage))
+					if noSearch {
+						return nil
+					}
+					lines, err := a.SearchMissingFor(ctx, it)
+					for _, l := range lines {
+						fmt.Println(" ", l)
+					}
 					return err
 				}
 				lang := it.OriginalLanguage
@@ -47,6 +64,7 @@ func newAddCmd() *cobra.Command {
 	cmd.Flags().IntVar(&opt.Year, "year", 0, "release year")
 	cmd.Flags().StringVar(&opt.OriginalLanguage, "lang", "", "original language as ISO 639-1 (fr, ja, de) when TMDB is not configured")
 	cmd.Flags().StringSliceVar(&opt.AltTitles, "alt-title", nil, "another name the film is released under (repeatable)")
+	cmd.Flags().BoolVar(&series, "series", false, "add a TV series instead of a movie (needs a TMDB key)")
 	cmd.Flags().BoolVar(&noSearch, "no-search", false, "add to the catalog without searching")
 	return cmd
 }
