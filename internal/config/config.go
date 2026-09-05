@@ -2,6 +2,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -59,8 +60,20 @@ type Config struct {
 	path string `yaml:"-"`
 }
 
+// homeDir resolves the user's home directory. When the environment does not
+// provide one -- as inside a bare sandbox or a launcher with a scrubbed
+// environment -- it reports false rather than yielding "", which would silently
+// turn every derived path into a relative one.
+func homeDir() (string, bool) {
+	h, err := os.UserHomeDir()
+	if err != nil || h == "" || !filepath.IsAbs(h) {
+		return "", false
+	}
+	return h, true
+}
+
 func Default() *Config {
-	home, _ := os.UserHomeDir()
+	home, _ := homeDir()
 	return &Config{
 		DataDir: filepath.Join(home, ".config", "butaca"),
 		Paths: Paths{
@@ -86,7 +99,10 @@ func Default() *Config {
 
 // DefaultPath is where the config lives unless overridden by --config.
 func DefaultPath() string {
-	home, _ := os.UserHomeDir()
+	home, ok := homeDir()
+	if !ok {
+		return ""
+	}
 	return filepath.Join(home, ".config", "butaca", "config.yaml")
 }
 
@@ -99,10 +115,26 @@ func Load(path string) (*Config, error) {
 	cfg := Default()
 	cfg.path = path
 
+	if path == "" {
+		// No home and no --config: only an explicit data directory can save us,
+		// and saying so beats creating ".config/butaca" under whatever the
+		// working directory happens to be.
+		applyEnv(cfg)
+		if !filepath.IsAbs(cfg.DataDir) {
+			return nil, errors.New(
+				"cannot determine your home directory: set BUTACA_DATA_DIR to an absolute path, or pass --config")
+		}
+		return cfg, nil
+	}
+
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			applyEnv(cfg)
+			if !filepath.IsAbs(cfg.DataDir) {
+				return nil, errors.New(
+					"cannot determine your home directory: set BUTACA_DATA_DIR to an absolute path")
+			}
 			return cfg, nil
 		}
 		return nil, fmt.Errorf("read config %s: %w", path, err)
@@ -112,6 +144,9 @@ func Load(path string) (*Config, error) {
 	}
 	cfg.path = path
 	applyEnv(cfg)
+	if !filepath.IsAbs(cfg.DataDir) {
+		return nil, fmt.Errorf("data_dir %q must be an absolute path", cfg.DataDir)
+	}
 	return cfg, nil
 }
 
@@ -147,6 +182,9 @@ func (c *Config) DBPath() string { return filepath.Join(c.DataDir, "butaca.db") 
 func (c *Config) Save() error {
 	if c.path == "" {
 		c.path = DefaultPath()
+	}
+	if c.path == "" {
+		return errors.New("no config path: pass --config, or set HOME")
 	}
 	if err := os.MkdirAll(filepath.Dir(c.path), 0o755); err != nil {
 		return err
