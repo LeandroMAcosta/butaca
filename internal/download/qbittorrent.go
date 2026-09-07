@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -83,24 +84,36 @@ func (c *Client) login(ctx context.Context) error {
 }
 
 func (c *Client) post(ctx context.Context, path string, form url.Values) error {
+	_, err := c.postRaw(ctx, path, form)
+	return err
+}
+
+// postRaw returns the response body so callers that need it can read it. Any
+// 2xx counts as success: qBittorrent 5.2 answers torrents/add with 202
+// Accepted, and insisting on 200 reported working grabs as failures.
+func (c *Client) postRaw(ctx context.Context, path string, form url.Values) ([]byte, error) {
 	if err := c.login(ctx); err != nil {
-		return err
+		return nil, err
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+path, strings.NewReader(form.Encode()))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Referer", c.baseURL)
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return fmt.Errorf("qbittorrent unreachable at %s: %w", c.baseURL, err)
+		return nil, fmt.Errorf("qbittorrent unreachable at %s: %w", c.baseURL, err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("qbittorrent %s: HTTP %d", path, resp.StatusCode)
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		return nil, fmt.Errorf("qbittorrent %s: HTTP %d", path, resp.StatusCode)
 	}
-	return nil
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
+	if err != nil {
+		return nil, fmt.Errorf("qbittorrent %s: reading response: %w", path, err)
+	}
+	return body, nil
 }
 
 func (c *Client) Version(ctx context.Context) (string, error) {
@@ -119,11 +132,31 @@ func (c *Client) Version(ctx context.Context) (string, error) {
 }
 
 // Add submits a magnet or .torrent URL under butaca's category.
+//
+// qBittorrent 5.2 made this endpoint asynchronous. It answers 202 Accepted with
+// a JSON summary and fetches the .torrent afterwards, so a successful add
+// carries no torrent id yet and pending_count is the normal outcome. Older
+// versions answer 200 with a bare "Ok.", which is why the body is optional.
 func (c *Client) Add(ctx context.Context, link string) error {
-	return c.post(ctx, "/api/v2/torrents/add", url.Values{
+	body, err := c.postRaw(ctx, "/api/v2/torrents/add", url.Values{
 		"urls":     {link},
 		"category": {c.category},
 	})
+	if err != nil {
+		return err
+	}
+	var res struct {
+		FailureCount int `json:"failure_count"`
+		PendingCount int `json:"pending_count"`
+		SuccessCount int `json:"success_count"`
+	}
+	if json.Unmarshal(body, &res) != nil {
+		return nil // pre-5.2 plain-text reply; the 2xx already told us it worked
+	}
+	if res.FailureCount > 0 && res.SuccessCount == 0 && res.PendingCount == 0 {
+		return fmt.Errorf("qbittorrent rejected the link: check it is reachable from qBittorrent itself, which is not localhost when it runs in a container")
+	}
+	return nil
 }
 
 // Delete removes the torrent and, when deleteFiles is set, its payload. Both
