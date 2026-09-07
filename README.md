@@ -69,6 +69,20 @@ cd sidecar && uv run --with fastapi --with 'uvicorn[standard]' \
 ./butaca status
 ```
 
+### Running qBittorrent or Prowlarr in Docker while butaca is native
+
+Three things bite in that mix, all of them silent:
+
+- **Point `prowlarr.url` at a routable address, not `localhost`.** Prowlarr builds its
+  download URLs from the host you queried it on, so `localhost` produces links that mean
+  nothing inside the qBittorrent container and every grab fails.
+- **Mount the media tree at the same absolute path in the container as on the host.**
+  qBittorrent reports the path it saved to and butaca then stats it locally, so a
+  container-only `/media` fails every import with `no such file or directory`.
+- **qBittorrent's localhost auth bypass will not apply.** Reached through a published
+  port, the container sees the Docker gateway rather than localhost, so either set
+  credentials or whitelist that subnet in `WebUI\AuthSubnetWhitelist`.
+
 The wizard runs automatically the first time butaca is used interactively.
 Non-interactive runs (Docker, cron, MCP) skip it and use defaults and
 environment variables instead.
