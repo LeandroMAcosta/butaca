@@ -122,8 +122,10 @@ cp .env.example .env      # add your Prowlarr API key
 docker compose up -d
 ```
 
-`docker-compose.yml` runs the four services together with one shared `media`
-volume. Do not use it on macOS: see the next section.
+`docker-compose.yml` runs butaca, the sidecar and Prowlarr together, bind-mounting
+`MEDIA_ROOT` at its own host path so hardlinks and qBittorrent's reported paths keep
+working. qBittorrent is still native even here. Do not use this on macOS: see the
+next section.
 
 ### Running qBittorrent or Prowlarr in Docker while butaca is native
 

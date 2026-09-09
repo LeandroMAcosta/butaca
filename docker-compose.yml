@@ -1,33 +1,51 @@
-# butaca, its parsing sidecar, and the two services it delegates to.
+# butaca, its parsing sidecar, and Prowlarr.
 #
-# The media volume is mounted at the SAME path in butaca and qbittorrent. That
-# is not cosmetic: imports are hardlinks, and a hardlink cannot cross a
-# filesystem boundary. Different mount points would break every import.
+# CRITICAL: the media tree is bind-mounted at its own host path inside every
+# container, not at a container-only /media. Two reasons. Imports are hardlinks,
+# which cannot cross a filesystem boundary, so the mount must be one tree. And
+# qBittorrent runs on the host, so every path it reports back has to resolve
+# identically inside these containers; a container-only path fails every import
+# with ENOENT. `docker compose exec butaca butaca status` checks this.
+#
+# qBittorrent is deliberately absent: it runs natively on the host. See the
+# README for why containerising it breaks Docker Desktop's networking outright.
 
 services:
   butaca:
     build: .
-    depends_on: [butaca-parse, prowlarr, qbittorrent]
+    image: butaca:${BUTACA_TAG:-local}
+    container_name: butaca
+    depends_on: [butaca-parse, prowlarr]
     environment:
+      TZ: ${TZ:-Europe/Madrid}
       BUTACA_DATA_DIR: /data
-      BUTACA_MOVIES_PATH: /media/movies
-      BUTACA_TV_PATH: /media/tv
-      BUTACA_DOWNLOADS_PATH: /media/downloads
+      BUTACA_MOVIES_PATH: ${MEDIA_ROOT:?set MEDIA_ROOT in .env}/movies
+      BUTACA_TV_PATH: ${MEDIA_ROOT}/tv
+      BUTACA_DOWNLOADS_PATH: ${MEDIA_ROOT}/downloads
       BUTACA_PROWLARR_URL: http://prowlarr:9696
-      BUTACA_QBITTORRENT_URL: http://qbittorrent:8080
+      # qBittorrent is on the host, not on this network.
+      BUTACA_QBITTORRENT_URL: ${QBITTORRENT_URL:-http://host.docker.internal:8080}
       BUTACA_PARSE_URL: http://butaca-parse:8000
       PROWLARR_API_KEY: ${PROWLARR_API_KEY:?set PROWLARR_API_KEY in .env}
       TMDB_API_KEY: ${TMDB_API_KEY:-}
     volumes:
-      - butaca-data:/data
-      - media:/media
+      - ${DATA_ROOT:?set DATA_ROOT in .env}/butaca:/data
+      - ${MEDIA_ROOT}:${MEDIA_ROOT}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # No published ports: the interfaces are CLI, TUI and MCP, not HTTP.
     command: ["serve"]
     restart: unless-stopped
 
   butaca-parse:
     build: ./sidecar
+    image: butaca-parse:${BUTACA_TAG:-local}
+    container_name: butaca-parse
+    environment:
+      TZ: ${TZ:-Europe/Madrid}
     volumes:
-      - media:/media          # subliminal writes .srt next to the video
+      # subliminal writes .srt next to the video, so it needs the media tree.
+      - ${MEDIA_ROOT}:${MEDIA_ROOT}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
@@ -36,35 +54,14 @@ services:
     restart: unless-stopped
 
   prowlarr:
-    image: lscr.io/linuxserver/prowlarr:latest
+    image: lscr.io/linuxserver/prowlarr:${PROWLARR_TAG:-latest}
+    container_name: prowlarr
     environment:
       PUID: ${PUID:-1000}
       PGID: ${PGID:-1000}
       TZ: ${TZ:-Europe/Madrid}
     volumes:
-      - prowlarr-config:/config
+      - ${DATA_ROOT}/prowlarr:/config
     ports:
-      - "9696:9696"
+      - "9696:9696/tcp"
     restart: unless-stopped
-
-  qbittorrent:
-    image: lscr.io/linuxserver/qbittorrent:latest
-    environment:
-      PUID: ${PUID:-1000}
-      PGID: ${PGID:-1000}
-      TZ: ${TZ:-Europe/Madrid}
-      WEBUI_PORT: 8080
-    volumes:
-      - qbittorrent-config:/config
-      - media:/media          # same path as butaca, so hardlinks work
-    ports:
-      - "8080:8080"
-      - "6881:6881"
-      - "6881:6881/udp"
-    restart: unless-stopped
-
-volumes:
-  butaca-data:
-  prowlarr-config:
-  qbittorrent-config:
-  media:
