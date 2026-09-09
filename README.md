@@ -50,28 +50,84 @@ together.
 
 ## Quick start
 
+butaca is the brain, not the muscle. It needs three things running before it is
+useful, in this order:
+
+### 1. qBittorrent — the main dependency
+
+Every download goes through it, and it must see the media tree at the **same
+absolute path** butaca does (imports are hardlinks). Install it natively:
+
+- **macOS**: the Homebrew cask is disabled (unsigned app, since 2026-09-01) and
+  running it inside Docker Desktop breaks networking for every container (see
+  below). Download the dmg from the [qBittorrent releases](https://github.com/qbittorrent/qBittorrent/releases),
+  copy `qbittorrent.app` to `/Applications`, then
+  `xattr -dr com.apple.quarantine /Applications/qBittorrent.app`.
+- **Linux**: `apt install qbittorrent-nox` (or your distro's package) and run it
+  as a service.
+
+Then, in its settings (or `qBittorrent.ini` before first launch):
+
+```ini
+[Preferences]
+WebUI\Enabled=true
+WebUI\Port=8080
+WebUI\LocalHostAuth=false     ; butaca talks to it from localhost, no password needed
+[BitTorrent]
+Session\DefaultSavePath=/path/to/media/downloads
+```
+
+### 2. Prowlarr — one search API for every tracker
+
+Docker is fine for this one:
+
+```sh
+docker run -d --name prowlarr -p 9696:9696 -v prowlarr-config:/config lscr.io/linuxserver/prowlarr
+```
+
+Open `http://localhost:9696`, add your indexers, copy the API key from
+Settings → General. Point `prowlarr.url` at a routable address, not
+`localhost`, if qBittorrent could ever be in a container.
+
+### 3. butaca-parse — the Python sidecar
+
+Owns `guessit` (release-name parsing), `subliminal` (subtitles) and `ffprobe`:
+
+```sh
+cd sidecar && uv run --with fastapi --with 'uvicorn[standard]' \
+  --with guessit --with subliminal --with babelfish \
+  uvicorn app:app --port 8000
+```
+
+### 4. butaca
+
+```sh
+go build -o butaca ./cmd/butaca
+./butaca setup          # asks where media lives, which language, which subtitles
+./butaca status         # every dependency must say ok, and hardlinks ok
+```
+
+The wizard runs automatically the first time butaca is used interactively.
+Non-interactive runs (Docker, cron, MCP) skip it and use defaults and
+environment variables instead.
+
+A TMDB API key (free, themoviedb.org → Settings → API) is optional but
+recommended: without it `add` needs `--lang`, and series and recommendations do
+not work at all.
+
+### All in Docker (Linux hosts)
+
 ```sh
 cp .env.example .env      # add your Prowlarr API key
 docker compose up -d
 ```
 
-Or run it directly:
-
-```sh
-go build -o butaca ./cmd/butaca
-
-# the sidecar
-cd sidecar && uv run --with fastapi --with 'uvicorn[standard]' \
-  --with guessit --with subliminal --with babelfish \
-  uvicorn app:app --port 8000
-
-./butaca setup          # asks where media lives, which language, which subtitles
-./butaca status
-```
+`docker-compose.yml` runs the four services together with one shared `media`
+volume. Do not use it on macOS: see the next section.
 
 ### Running qBittorrent or Prowlarr in Docker while butaca is native
 
-Three things bite in that mix, all of them silent:
+Four things bite in that mix, all of them silent:
 
 - **Point `prowlarr.url` at a routable address, not `localhost`.** Prowlarr builds its
   download URLs from the host you queried it on, so `localhost` produces links that mean
@@ -82,10 +138,14 @@ Three things bite in that mix, all of them silent:
 - **qBittorrent's localhost auth bypass will not apply.** Reached through a published
   port, the container sees the Docker gateway rather than localhost, so either set
   credentials or whitelist that subnet in `WebUI\AuthSubnetWhitelist`.
-
-The wizard runs automatically the first time butaca is used interactively.
-Non-interactive runs (Docker, cron, MCP) skip it and use defaults and
-environment variables instead.
+- **On macOS, do not put qBittorrent inside Docker Desktop at all.** Its VM engine
+  (`com.docker.sailor`) proxies every guest flow with a host thread, and macOS caps a
+  process at 4096 threads (`kern.num_taskthreads`). qBittorrent's DHT opens thousands
+  of UDP flows, the cap is hit within about half an hour, and from then on every
+  container's outbound connection is refused: Prowlarr reports all indexers down,
+  Pi-hole stops resolving, `butaca status` still says `prowlarr ok`. Restarting Docker
+  only resets the counter. Run qBittorrent natively; the config it needs is
+  `WebUI\Enabled=true`, `WebUI\LocalHostAuth=false` and the same `save_path`.
 
 ## Migrating from Radarr
 
@@ -115,8 +175,9 @@ Each job has its own ticker, so a slow search never delays an import.
 claude mcp add butaca -- /path/to/butaca mcp
 ```
 
-Eight tools: `list`, `add`, `search`, `grab`, `remove`, `status`, `subtitles`,
-`import`. `remove` is one call that clears the catalog row, the library folder
+Fifteen tools: `list`, `add`, `search`, `grab`, `remove`, `import`, `status`,
+`subtitles`, `watch`, `watchlist`, `profiles`, `recommend`, `languages`, `disk`
+and `letterboxd_import`. `remove` is one call that clears the catalog row, the library folder
 and the torrent together — with hardlinks, doing only one of the three frees no
 disk space.
 
@@ -126,7 +187,7 @@ disk space.
 butaca tui                                  # five tabs: library, watchlist, queue, discover, profiles
 butaca find "Dune Part Two 2024"            # search for something you don't have
 butaca find "Dune Part Two 2024" --grab 1   # add it and start the download
-butaca add "Taxi Driver" --year 1976        # add and search
+butaca add "Taxi Driver" --year 1976 --lang en   # add, search, grab; --lang only without a TMDB key
 butaca add "Severance" --series             # series need a TMDB key
 butaca add "Amélie" --lang fr --alt-title "Le Fabuleux Destin d'Amélie Poulain"
 butaca search Amélie --explain              # every release, scored, with reasons
@@ -168,6 +229,14 @@ paths:
   movies: /media/movies
   tv: /media/tv
   downloads: /media/downloads   # must share a filesystem with the two above
+prowlarr:
+  url: http://192.168.1.10:9696 # routable, not localhost, if qBittorrent is a container
+  api_key: ...
+qbittorrent:
+  url: http://localhost:8080
+  category: butaca              # every torrent butaca adds carries this
+tmdb:
+  api_key: ""                   # optional: series, recommendations, automatic original_language
 rules:
   min_seeders: 5
   resolutions: ["1080p"]        # ordered, best first

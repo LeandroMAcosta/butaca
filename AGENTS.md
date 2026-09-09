@@ -98,6 +98,10 @@ languages, a Letterboxd account and (via `items.profile_id`) its own watchlist.
 - **Indexes on migrated columns go in `store.Open` after the ALTERs**, not in
   `schema.sql`: an old database cannot index a column that does not exist yet.
 - **Never query the database from a TUI view.** Views repaint on every keystroke.
+- **qBittorrent inside Docker Desktop on macOS kills every container's egress.**
+  The VM engine spends one host thread per guest flow; DHT opens thousands and
+  macOS caps a process at 4096. `status` cannot see it because it only checks
+  that Prowlarr answers, not that its indexers can. Run qBittorrent natively.
   Load into the model in `reload()`; `b.langs` exists for exactly this reason.
 - **TUI commands guard against a nil `app`**, which is what makes the whole
   interface testable headlessly.
