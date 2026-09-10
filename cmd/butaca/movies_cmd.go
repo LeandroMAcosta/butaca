@@ -175,12 +175,17 @@ func newListCmd() *cobra.Command {
 					return nil
 				}
 				w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-				fmt.Fprintln(w, "ID\tTITLE\tYEAR\tLANG\tFILES\tSIZE")
+				fmt.Fprintln(w, "ID\tTITLE\tYEAR\tLANG\tFILES\tSIZE\tLIBRARY")
 				var total int64
 				for _, it := range items {
 					total += it.SizeBytes
-					fmt.Fprintf(w, "%d\t%s\t%d\t%s\t%d\t%s\n",
-						it.ID, truncate(it.Title, 40), it.Year, orDash(it.OriginalLanguage), it.FileCount, humanSize(it.SizeBytes))
+					lib := "series"
+					if it.Kind == "movie" {
+						lib = a.LibraryOf(it)
+					}
+					fmt.Fprintf(w, "%d\t%s\t%d\t%s\t%d\t%s\t%s\n",
+						it.ID, truncate(it.Title, 40), it.Year, orDash(it.OriginalLanguage), it.FileCount,
+						humanSize(it.SizeBytes), lib)
 				}
 				fmt.Fprintf(w, "\t\t\t\t\t%s\n", humanSize(total))
 				return w.Flush()
