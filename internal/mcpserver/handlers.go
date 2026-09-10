@@ -199,7 +199,11 @@ func (s *Server) handleRemove(ctx context.Context, req mcp.CallToolRequest) (*mc
 	if err != nil {
 		return fail(err), nil
 	}
-	steps, err := s.app.Remove(ctx, it, app.RemoveOptions{KeepFiles: req.GetBool("keep_files", false)})
+	opt := app.RemoveOptions{KeepFiles: req.GetBool("keep_files", false)}
+	if req.GetBool("dry_run", false) {
+		return lines("would remove "+it.Title+":", s.app.RemovePlan(it, opt), ""), nil
+	}
+	steps, err := s.app.Remove(ctx, it, opt)
 	out := make([]string, 0, len(steps))
 	for _, st := range steps {
 		out = append(out, st.String())

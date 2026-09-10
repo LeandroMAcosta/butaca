@@ -52,6 +52,18 @@ func (s *Server) register() {
 		mcp.WithBoolean("search", mcp.Description("Search and grab immediately (default true)")),
 	), s.handleAdd)
 
+	s.mcp.AddTool(mcp.NewTool("find",
+		mcp.WithDescription(
+			"Search the trackers for a film that is not in the catalog, without changing "+
+				"anything. Returns JSON: releases sorted best first, each with a stable id. "+
+				"Pass grab with one of those ids to catalogue the film and download that "+
+				"exact release; if it is gone from fresh results this fails rather than "+
+				"picking another. Adding the year to the query helps: \"Amelie 2001\"."),
+		mcp.WithString("query", mcp.Required(), mcp.Description("Film title, optionally followed by its year")),
+		mcp.WithBoolean("all", mcp.Description("Include rejected releases and why (default false)")),
+		mcp.WithString("grab", mcp.Description("Release id from a previous find: catalogue the film and download it")),
+	), s.handleFind)
+
 	s.mcp.AddTool(mcp.NewTool("search",
 		mcp.WithDescription(
 			"Search releases for something already in the catalog. Returns every candidate "+
@@ -75,6 +87,7 @@ func (s *Server) register() {
 				"the download, so removing only one frees no disk space."),
 		mcp.WithString("item", mcp.Required(), mcp.Description("Catalog id or part of the title")),
 		mcp.WithBoolean("keep_files", mcp.Description("Remove the catalog entry only, leaving files and torrent")),
+		mcp.WithBoolean("dry_run", mcp.Description("List what would be deleted without touching anything")),
 	), s.handleRemove)
 
 	s.mcp.AddTool(mcp.NewTool("status",

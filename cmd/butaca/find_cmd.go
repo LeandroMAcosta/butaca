@@ -8,7 +8,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/LeandroMAcosta/butaca/internal/app"
-	"github.com/LeandroMAcosta/butaca/internal/decide"
 	"github.com/LeandroMAcosta/butaca/internal/library"
 )
 
@@ -38,8 +37,8 @@ func newFindCmd() *cobra.Command {
 				// The same release comes back from several trackers, so merge
 				// them before printing anything.
 				total := len(cands)
-				cands, mirrors := dedupeByTitle(cands)
-				sortByScore(cands)
+				cands, mirrors := app.DedupeReleases(cands)
+				app.SortByScore(cands)
 
 				accepted := 0
 				for _, c := range cands {
@@ -69,7 +68,7 @@ func newFindCmd() *cobra.Command {
 						mark = "x"
 					}
 					mirror := ""
-					if n := mirrors[normalizeTitle(c.Release.Title)]; n > 1 {
+					if n := mirrors[app.ReleaseKey(c.Release.Title)]; n > 1 {
 						mirror = fmt.Sprintf(" x%d", n)
 					}
 					fmt.Printf("%s%2d  %5d  %-46s %-7s %9s %6d%s\n",
@@ -104,50 +103,4 @@ func newFindCmd() *cobra.Command {
 	cmd.Flags().IntVar(&grab, "grab", 0, "add release N to the catalog and download it")
 	cmd.Flags().BoolVar(&all, "all", false, "show rejected releases and why")
 	return cmd
-}
-
-// dedupeByTitle collapses the same release seen through several indexers,
-// keeping the best-seeded copy and counting how many carried it.
-func dedupeByTitle(cands []decide.Candidate) ([]decide.Candidate, map[string]int) {
-	best := map[string]int{}
-	mirrors := map[string]int{}
-	var out []decide.Candidate
-	for _, c := range cands {
-		key := normalizeTitle(c.Release.Title)
-		mirrors[key]++
-		idx, seen := best[key]
-		if !seen {
-			best[key] = len(out)
-			out = append(out, c)
-			continue
-		}
-		if c.Release.Seeders > out[idx].Release.Seeders {
-			out[idx] = c
-		}
-	}
-	return out, mirrors
-}
-
-func normalizeTitle(title string) string {
-	var b strings.Builder
-	for _, r := range strings.ToLower(title) {
-		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
-			b.WriteRune(r)
-		}
-	}
-	return b.String()
-}
-
-func sortByScore(cands []decide.Candidate) {
-	for i := 1; i < len(cands); i++ {
-		for j := i; j > 0; j-- {
-			a, b := cands[j-1], cands[j]
-			better := (b.Accepted() && !a.Accepted()) ||
-				(b.Accepted() == a.Accepted() && b.Score > a.Score)
-			if !better {
-				break
-			}
-			cands[j-1], cands[j] = cands[j], cands[j-1]
-		}
-	}
 }
