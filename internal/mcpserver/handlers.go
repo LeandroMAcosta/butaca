@@ -201,7 +201,7 @@ func (s *Server) handleRemove(ctx context.Context, req mcp.CallToolRequest) (*mc
 	}
 	opt := app.RemoveOptions{KeepFiles: req.GetBool("keep_files", false)}
 	if req.GetBool("dry_run", false) {
-		return lines("would remove "+it.Title+":", s.app.RemovePlan(it, opt), ""), nil
+		return lines("would remove "+it.Title+":", s.app.RemovePlan(ctx, it, opt), ""), nil
 	}
 	steps, err := s.app.Remove(ctx, it, opt)
 	out := make([]string, 0, len(steps))

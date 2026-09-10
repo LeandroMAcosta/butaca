@@ -130,7 +130,7 @@ func (b *browser) startRemove() (tea.Model, tea.Cmd) {
 	b.confirm = &confirmState{
 		item:  it,
 		opt:   opt,
-		plan:  b.app.RemovePlan(it, opt),
+		plan:  b.app.RemovePlan(contextTODO(), it, opt),
 		title: "Remove " + it.Title + "?",
 	}
 	b.mode = modeConfirm

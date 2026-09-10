@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
+	"time"
 
 	"github.com/LeandroMAcosta/butaca/internal/library"
 	"github.com/LeandroMAcosta/butaca/internal/store"
@@ -61,22 +63,16 @@ func (a *App) Remove(ctx context.Context, it *store.Item, opt RemoveOptions) ([]
 	}
 
 	if !opt.KeepFiles && !opt.KeepTorrent {
-		pending, err := a.Store.PendingQueue()
+		hashes, err := a.itemTorrents(ctx, it)
 		if err != nil {
-			steps = append(steps, RemoveStep{What: "read queue", Err: err})
+			steps = append(steps, RemoveStep{What: "look up torrents", Err: err})
+		} else if len(hashes) == 0 {
+			steps = append(steps, RemoveStep{What: "no torrent in qBittorrent for this item"})
 		}
-		found := false
-		for _, q := range pending {
-			if q.ItemID != it.ID {
-				continue
-			}
-			found = true
-			err := a.QBit.Delete(ctx, q.InfoHash, true)
+		for _, h := range hashes {
+			err := a.QBit.Delete(ctx, h, true)
 			steps = append(steps, RemoveStep{
-				What: "removed torrent " + shortHash(q.InfoHash), Done: err == nil, Err: err})
-		}
-		if !found {
-			steps = append(steps, RemoveStep{What: "no torrent tracked for this item"})
+				What: "removed torrent " + shortHash(h), Done: err == nil, Err: err})
 		}
 	}
 
@@ -90,7 +86,7 @@ func (a *App) Remove(ctx context.Context, it *store.Item, opt RemoveOptions) ([]
 }
 
 // RemovePlan describes what Remove would do, for a confirmation prompt.
-func (a *App) RemovePlan(it *store.Item, opt RemoveOptions) []string {
+func (a *App) RemovePlan(ctx context.Context, it *store.Item, opt RemoveOptions) []string {
 	var plan []string
 	if !opt.KeepFiles && it.Path != "" {
 		if _, err := os.Stat(it.Path); err == nil {
@@ -98,16 +94,46 @@ func (a *App) RemovePlan(it *store.Item, opt RemoveOptions) []string {
 		}
 	}
 	if !opt.KeepFiles && !opt.KeepTorrent {
-		if pending, err := a.Store.PendingQueue(); err == nil {
-			for _, q := range pending {
-				if q.ItemID == it.ID {
-					plan = append(plan, "delete torrent "+shortHash(q.InfoHash)+" and its files")
-				}
-			}
+		// A prompt must not hang on an unresponsive download client.
+		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+		hashes, err := a.itemTorrents(ctx, it)
+		if err != nil {
+			plan = append(plan, "delete its torrent and files, if qBittorrent has one (could not check: "+err.Error()+")")
+		}
+		for _, h := range hashes {
+			plan = append(plan, "delete torrent "+shortHash(h)+" and its files")
 		}
 	}
 	plan = append(plan, fmt.Sprintf("remove %q from the catalog", it.Title))
 	return plan
+}
+
+// itemTorrents returns the hashes of the item's torrents that qBittorrent
+// still holds. Imported ones are included on purpose: the download is a second
+// hardlink to the library file, and while it exists no byte is freed.
+func (a *App) itemTorrents(ctx context.Context, it *store.Item) ([]string, error) {
+	entries, err := a.Store.QueueForItem(it.ID)
+	if err != nil || len(entries) == 0 {
+		return nil, err
+	}
+	held, err := a.QBit.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	have := make(map[string]bool, len(held))
+	for _, t := range held {
+		have[strings.ToLower(t.Hash)] = true
+	}
+	var out []string
+	for _, q := range entries {
+		h := strings.ToLower(q.InfoHash)
+		if have[h] {
+			out = append(out, h)
+			have[h] = false
+		}
+	}
+	return out, nil
 }
 
 func shortHash(h string) string {

@@ -28,6 +28,28 @@ func (s *Store) PendingQueue() ([]*QueueEntry, error) {
 	return out, rows.Err()
 }
 
+// QueueForItem returns every download ever recorded for an item, whatever its
+// state. An imported torrent still holds a hardlink to the library file, so
+// removal has to find those too.
+func (s *Store) QueueForItem(itemID int64) ([]*QueueEntry, error) {
+	rows, err := s.db.Query(`
+		SELECT id, item_id, episode_id, release_title, COALESCE(magnet,''), info_hash, state, size, progress
+		FROM queue WHERE item_id = ?`, itemID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []*QueueEntry
+	for rows.Next() {
+		var q QueueEntry
+		if err := rows.Scan(&q.ID, &q.ItemID, &q.EpisodeID, &q.ReleaseTitle, &q.Magnet, &q.InfoHash, &q.State, &q.Size, &q.Progress); err != nil {
+			return nil, err
+		}
+		out = append(out, &q)
+	}
+	return out, rows.Err()
+}
+
 func (s *Store) SetQueueState(infoHash, state string, progress float64) error {
 	_, err := s.db.Exec(`UPDATE queue SET state=?, progress=? WHERE info_hash=?`, state, progress, infoHash)
 	return err

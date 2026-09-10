@@ -124,7 +124,7 @@ func (b *browser) confirmKey(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Toggling re-computes the plan, so the list always matches the action.
 		c.opt.KeepFiles = !c.opt.KeepFiles
 		if b.app != nil {
-			c.plan = b.app.RemovePlan(c.item, c.opt)
+			c.plan = b.app.RemovePlan(contextTODO(), c.item, c.opt)
 		}
 		return b, nil
 	case "n", "N", "esc", "q":
