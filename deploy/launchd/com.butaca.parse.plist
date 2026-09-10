@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  butaca-parse, the guessit/subliminal/ffprobe sidecar, run natively on :8001.
+  Template: install.sh fills in the @...@ placeholders. Do not load it as is.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.butaca.parse</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>@UV@</string>
+    <string>run</string>
+    <string>--python</string>
+    <string>3.12</string>
+    <string>--with-requirements</string>
+    <string>requirements.txt</string>
+    <string>uvicorn</string>
+    <string>app:app</string>
+    <string>--host</string>
+    <string>127.0.0.1</string>
+    <string>--port</string>
+    <string>8001</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>@BUTACA_DIR@/sidecar</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+  <!-- ffprobe comes from Homebrew, which is not on launchd's default PATH. -->
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>@LOG_DIR@/parse.log</string>
+  <key>StandardErrorPath</key>
+  <string>@LOG_DIR@/parse.log</string>
+</dict>
+</plist>

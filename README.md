@@ -171,17 +171,37 @@ butaca serve --search-interval 0    # disable a job
 
 Each job has its own ticker, so a slow search never delays an import.
 
+On macOS, run both `serve` and the sidecar under launchd rather than from a
+terminal. Started from a shell, they die with it, and from then on finished
+downloads sit in qBittorrent without being imported:
+
+```sh
+deploy/launchd/install.sh             # build, then install com.butaca.serve and com.butaca.parse
+deploy/launchd/install.sh uninstall   # stop and remove both
+```
+
+Both start at login and restart if they exit. Logs go to `~/Library/Logs/butaca/`.
+The sidecar listens on `127.0.0.1:8001`, so `parse.url` must be `http://localhost:8001`.
+Stop any sidecar you started by hand first, or the agent cannot bind the port.
+
 ## Driving it from Claude
 
 ```sh
 claude mcp add butaca -- /path/to/butaca mcp
 ```
 
-Fifteen tools: `list`, `add`, `search`, `grab`, `remove`, `import`, `status`,
+Sixteen tools: `list`, `find`, `add`, `search`, `grab`, `remove`, `import`, `status`,
 `subtitles`, `watch`, `watchlist`, `profiles`, `recommend`, `languages`, `disk`
 and `letterboxd_import`. `remove` is one call that clears the catalog row, the library folder
 and the torrent together — with hardlinks, doing only one of the three frees no
-disk space.
+disk space. `remove` with `dry_run` lists what it would delete and touches nothing.
+
+`find` is the MCP form of `butaca find`, for a film not in the catalog. It returns
+JSON, and every release carries an `id` (the infohash, or the Prowlarr GUID) that
+stays valid across searches. `find` with `grab: <id>` catalogues the film and downloads
+that exact release. It fails, rather than picking another, if the release has left
+the results. That split lets a client show the choices and ask before anything is
+downloaded.
 
 ## Usage
 

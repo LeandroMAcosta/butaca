@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  `butaca serve`: imports finished downloads every minute, searches for missing
+  items every 6h, fills subtitle gaps every 12h. Reads ~/.config/butaca.
+  Template: install.sh fills in the @...@ placeholders. Do not load it as is.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.butaca.serve</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>@BUTACA_DIR@/butaca</string>
+    <string>serve</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>@BUTACA_DIR@</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>@LOG_DIR@/serve.log</string>
+  <key>StandardErrorPath</key>
+  <string>@LOG_DIR@/serve.log</string>
+</dict>
+</plist>
