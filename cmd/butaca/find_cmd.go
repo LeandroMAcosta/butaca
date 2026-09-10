@@ -13,7 +13,7 @@ import (
 
 func newFindCmd() *cobra.Command {
 	var grab int
-	var all bool
+	var all, documentary bool
 
 	cmd := &cobra.Command{
 		Use:   "find <title>",
@@ -23,7 +23,7 @@ func newFindCmd() *cobra.Command {
 			"fills in the rest afterwards when it is configured.\n\n" +
 			"Adding a year helps: `butaca find \"Amelie 2001\"`.",
 		Args: cobra.MinimumNArgs(1),
-		RunE: func(_ *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			query := strings.Join(args, " ")
 			return withApp(func(ctx context.Context, a *app.App) error {
 				cands, err := a.SearchNew(ctx, query)
@@ -88,7 +88,7 @@ func newFindCmd() *cobra.Command {
 						return fmt.Errorf("there is no release #%d", grab)
 					}
 					c := cands[grab-1]
-					it, err := a.AddFromRelease(ctx, c, query)
+					it, err := a.AddFromRelease(ctx, c, query, documentaryFlag(cmd, documentary))
 					if err != nil {
 						return err
 					}
@@ -102,5 +102,6 @@ func newFindCmd() *cobra.Command {
 	}
 	cmd.Flags().IntVar(&grab, "grab", 0, "add release N to the catalog and download it")
 	cmd.Flags().BoolVar(&all, "all", false, "show rejected releases and why")
+	cmd.Flags().BoolVar(&documentary, "documentary", false, "with --grab, file it under paths.documentaries")
 	return cmd
 }

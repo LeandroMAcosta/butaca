@@ -35,9 +35,10 @@ type findResult struct {
 
 type findGrabbed struct {
 	Added struct {
-		ID    int64  `json:"id"`
-		Title string `json:"title"`
-		Year  int    `json:"year"`
+		ID      int64  `json:"id"`
+		Title   string `json:"title"`
+		Year    int    `json:"year"`
+		Library string `json:"library"`
 	} `json:"added"`
 	Release string `json:"release"`
 }
@@ -48,7 +49,7 @@ func (s *Server) handleFind(ctx context.Context, req mcp.CallToolRequest) (*mcp.
 		return fail(err), nil
 	}
 	if id := req.GetString("grab", ""); id != "" {
-		return s.findGrab(ctx, query, id)
+		return s.findGrab(ctx, query, id, optBool(req, "documentary"))
 	}
 
 	cands, err := s.app.SearchNew(ctx, query)
@@ -88,13 +89,14 @@ func (s *Server) handleFind(ctx context.Context, req mcp.CallToolRequest) (*mcp.
 	return jsonResult(res)
 }
 
-func (s *Server) findGrab(ctx context.Context, query, id string) (*mcp.CallToolResult, error) {
-	it, c, err := s.app.GrabNew(ctx, query, id)
+func (s *Server) findGrab(ctx context.Context, query, id string, documentary *bool) (*mcp.CallToolResult, error) {
+	it, c, err := s.app.GrabNew(ctx, query, id, documentary)
 	if err != nil {
 		return fail(err), nil
 	}
 	var out findGrabbed
 	out.Added.ID, out.Added.Title, out.Added.Year = it.ID, it.Title, it.Year
+	out.Added.Library = s.app.LibraryOf(it)
 	out.Release = c.Release.Title
 	return jsonResult(out)
 }

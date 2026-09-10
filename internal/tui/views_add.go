@@ -42,7 +42,7 @@ func (b *browser) addRelease(c decide.Candidate, title string) tea.Cmd {
 	}
 	a := b.app
 	return func() tea.Msg {
-		it, err := a.AddFromRelease(contextTODO(), c, title)
+		it, err := a.AddFromRelease(contextTODO(), c, title, nil)
 		if err != nil {
 			return actionDone{err: err}
 		}

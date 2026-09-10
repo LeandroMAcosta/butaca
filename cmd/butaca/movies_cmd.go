@@ -18,15 +18,16 @@ import (
 
 func newAddCmd() *cobra.Command {
 	var opt app.AddOptions
-	var noSearch, series bool
+	var noSearch, series, documentary bool
 
 	cmd := &cobra.Command{
 		Use:   "add <title>",
 		Short: "Add a movie or series and search for it",
 		Args:  cobra.MinimumNArgs(1),
-		RunE: func(_ *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			title := strings.Join(args, " ")
 			opt.Monitored = true
+			opt.Documentary = documentaryFlag(cmd, documentary)
 			return withApp(func(ctx context.Context, a *app.App) error {
 				add := a.AddMovie
 				if series {
@@ -53,7 +54,8 @@ func newAddCmd() *cobra.Command {
 				if lang == "" {
 					lang = "?"
 				}
-				fmt.Printf("added #%d  %s (%d)  original language: %s\n", it.ID, it.Title, it.Year, lang)
+				fmt.Printf("added #%d  %s (%d)  original language: %s  library: %s\n",
+					it.ID, it.Title, it.Year, lang, a.LibraryOf(it))
 				if noSearch {
 					return nil
 				}
@@ -66,6 +68,8 @@ func newAddCmd() *cobra.Command {
 	cmd.Flags().StringSliceVar(&opt.AltTitles, "alt-title", nil, "another name the film is released under (repeatable)")
 	cmd.Flags().BoolVar(&series, "series", false, "add a TV series instead of a movie (needs a TMDB key)")
 	cmd.Flags().BoolVar(&noSearch, "no-search", false, "add to the catalog without searching")
+	cmd.Flags().BoolVar(&documentary, "documentary", false,
+		"file it under paths.documentaries; --documentary=false forces movies")
 	return cmd
 }
 

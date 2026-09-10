@@ -12,9 +12,12 @@ import (
 )
 
 type Paths struct {
-	Movies    string `yaml:"movies"`
-	TV        string `yaml:"tv"`
-	Downloads string `yaml:"downloads"`
+	Movies string `yaml:"movies"`
+	// Documentaries is an optional second movie library. Empty means every
+	// movie goes to Movies.
+	Documentaries string `yaml:"documentaries,omitempty"`
+	TV            string `yaml:"tv"`
+	Downloads     string `yaml:"downloads"`
 }
 
 type Service struct {
@@ -162,6 +165,7 @@ func applyEnv(c *Config) {
 		}
 	}
 	set(&c.Paths.Movies, "BUTACA_MOVIES_PATH")
+	set(&c.Paths.Documentaries, "BUTACA_DOCUMENTARIES_PATH")
 	set(&c.Paths.TV, "BUTACA_TV_PATH")
 	set(&c.Paths.Downloads, "BUTACA_DOWNLOADS_PATH")
 	set(&c.Prowlarr.URL, "BUTACA_PROWLARR_URL")

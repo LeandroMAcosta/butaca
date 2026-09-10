@@ -50,7 +50,11 @@ func (s *Server) handleList(context.Context, mcp.CallToolRequest) (*mcp.CallTool
 		if it.FileCount > 0 {
 			state = humanSize(it.SizeBytes)
 		}
-		out = append(out, fmt.Sprintf("%d  %s (%d)  [%s]  %s", it.ID, it.Title, it.Year, orDash(it.OriginalLanguage), state))
+		row := fmt.Sprintf("%d  %s (%d)  [%s]  %s", it.ID, it.Title, it.Year, orDash(it.OriginalLanguage), state)
+		if it.Kind == "movie" && s.app.LibraryOf(it) == app.LibraryDocumentaries {
+			row += "  " + app.LibraryDocumentaries
+		}
+		out = append(out, row)
 	}
 	res := lines(fmt.Sprintf("%d items, %s on disk", len(items), humanSize(total)), out, "the catalog is empty")
 	return res, nil
@@ -65,6 +69,7 @@ func (s *Server) handleAdd(ctx context.Context, req mcp.CallToolRequest) (*mcp.C
 		Year:             req.GetInt("year", 0),
 		OriginalLanguage: req.GetString("original_language", ""),
 		Monitored:        true,
+		Documentary:      optBool(req, "documentary"),
 	}
 	if alt := req.GetString("alt_title", ""); alt != "" {
 		opt.AltTitles = []string{alt}
@@ -74,7 +79,8 @@ func (s *Server) handleAdd(ctx context.Context, req mcp.CallToolRequest) (*mcp.C
 	if err != nil {
 		return fail(err), nil
 	}
-	msg := fmt.Sprintf("added #%d  %s (%d)  original language: %s", it.ID, it.Title, it.Year, orDash(it.OriginalLanguage))
+	msg := fmt.Sprintf("added #%d  %s (%d)  original language: %s  library: %s",
+		it.ID, it.Title, it.Year, orDash(it.OriginalLanguage), s.app.LibraryOf(it))
 	if !req.GetBool("search", true) {
 		return mcp.NewToolResultText(msg), nil
 	}
@@ -222,8 +228,11 @@ func (s *Server) handleStatus(ctx context.Context, _ mcp.CallToolRequest) (*mcp.
 		fmt.Fprintf(&b, "  - %s\n", i.Name)
 	}
 	fmt.Fprintf(&b, "qbittorrent: %s\nbutaca-parse: %s\n", h.QBittorrent, h.Parse)
-	fmt.Fprintf(&b, "movies: %s\nseries: %s\ndownloads: %s\n",
-		s.app.Cfg.Paths.Movies, s.app.Cfg.Paths.TV, s.app.Cfg.Paths.Downloads)
+	fmt.Fprintf(&b, "movies: %s\n", s.app.Cfg.Paths.Movies)
+	if d := s.app.Cfg.Paths.Documentaries; d != "" {
+		fmt.Fprintf(&b, "documentaries: %s\n", d)
+	}
+	fmt.Fprintf(&b, "series: %s\ndownloads: %s\n", s.app.Cfg.Paths.TV, s.app.Cfg.Paths.Downloads)
 	if h.Hardlinkable {
 		b.WriteString("hardlinks: ok\n")
 	} else {

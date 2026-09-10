@@ -14,6 +14,9 @@ import (
 
 const version = "1.0.0"
 
+const documentaryHelp = "File it in the documentaries library instead of movies. " +
+	"Omit to let TMDB's genre decide when a TMDB key is configured."
+
 type Server struct {
 	app *app.App
 	mcp *server.MCPServer
@@ -49,6 +52,7 @@ func (s *Server) register() {
 		mcp.WithNumber("year", mcp.Description("Release year")),
 		mcp.WithString("original_language", mcp.Description("ISO 639-1 code of the film's original language, e.g. fr, ja, de")),
 		mcp.WithString("alt_title", mcp.Description("Another name it is released under, often the original-language title")),
+		mcp.WithBoolean("documentary", mcp.Description(documentaryHelp)),
 		mcp.WithBoolean("search", mcp.Description("Search and grab immediately (default true)")),
 	), s.handleAdd)
 
@@ -62,7 +66,17 @@ func (s *Server) register() {
 		mcp.WithString("query", mcp.Required(), mcp.Description("Film title, optionally followed by its year")),
 		mcp.WithBoolean("all", mcp.Description("Include rejected releases and why (default false)")),
 		mcp.WithString("grab", mcp.Description("Release id from a previous find: catalogue the film and download it")),
+		mcp.WithBoolean("documentary", mcp.Description(documentaryHelp+" Only used with grab.")),
 	), s.handleFind)
+
+	s.mcp.AddTool(mcp.NewTool("move",
+		mcp.WithDescription(
+			"Move a movie between the movies and documentaries libraries. Renames its "+
+				"folder, which keeps hardlinks and subtitles intact, and updates the catalog."),
+		mcp.WithString("item", mcp.Required(), mcp.Description("Catalog id or part of the title")),
+		mcp.WithString("to", mcp.Required(), mcp.Enum("movies", "documentaries"), mcp.Description("Destination library")),
+		mcp.WithBoolean("dry_run", mcp.Description("Report the from and to folders without moving anything")),
+	), s.handleMove)
 
 	s.mcp.AddTool(mcp.NewTool("search",
 		mcp.WithDescription(

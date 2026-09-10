@@ -65,6 +65,9 @@ func newStatusCmd() *cobra.Command {
 
 				fmt.Println("\npaths")
 				fmt.Printf("  movies       %s\n", a.Cfg.Paths.Movies)
+				if d := a.Cfg.Paths.Documentaries; d != "" {
+					fmt.Printf("  documentaries %s\n", d)
+				}
 				fmt.Printf("  tv           %s\n", a.Cfg.Paths.TV)
 				fmt.Printf("  downloads    %s\n", a.Cfg.Paths.Downloads)
 				if h.Hardlinkable {

@@ -79,7 +79,7 @@ func SortByScore(cands []decide.Candidate) {
 // is id, cataloguing the film first. It matches against every mirror, not
 // only the copy a deduplicated list showed, and it never falls back to
 // another release: a caller that confirmed one release must get that one.
-func (a *App) GrabNew(ctx context.Context, query, id string) (*store.Item, decide.Candidate, error) {
+func (a *App) GrabNew(ctx context.Context, query, id string, documentary *bool) (*store.Item, decide.Candidate, error) {
 	if id == "" {
 		return nil, decide.Candidate{}, fmt.Errorf("no release id given")
 	}
@@ -91,7 +91,7 @@ func (a *App) GrabNew(ctx context.Context, query, id string) (*store.Item, decid
 		if ReleaseID(c.Release) != id {
 			continue
 		}
-		it, err := a.AddFromRelease(ctx, c, query)
+		it, err := a.AddFromRelease(ctx, c, query, documentary)
 		return it, c, err
 	}
 	return nil, decide.Candidate{}, fmt.Errorf(

@@ -190,7 +190,7 @@ Stop any sidecar you started by hand first, or the agent cannot bind the port.
 claude mcp add butaca -- /path/to/butaca mcp
 ```
 
-Sixteen tools: `list`, `find`, `add`, `search`, `grab`, `remove`, `import`, `status`,
+Seventeen tools: `list`, `find`, `add`, `search`, `grab`, `remove`, `move`, `import`, `status`,
 `subtitles`, `watch`, `watchlist`, `profiles`, `recommend`, `languages`, `disk`
 and `letterboxd_import`. `remove` is one call that clears the catalog row, the library folder
 and the torrent together — with hardlinks, doing only one of the three frees no
@@ -249,8 +249,9 @@ REJECT   149  Le Fabuleux Destin d'Amélie Poulain (2001) 720p BRRip x264 -YTS
 ```yaml
 paths:
   movies: /media/movies
+  documentaries: /media/documentaries   # optional second movie library
   tv: /media/tv
-  downloads: /media/downloads   # must share a filesystem with the two above
+  downloads: /media/downloads   # must share a filesystem with the others
 prowlarr:
   url: http://192.168.1.10:9696 # routable, not localhost, if qBittorrent is a container
   api_key: ...
@@ -274,6 +275,25 @@ subtitles:
 `butaca status` reports whether `downloads` and `movies` actually share a
 filesystem. If they do not, imports fail loudly rather than silently copying and
 doubling disk usage.
+
+### Documentaries
+
+With `paths.documentaries` set, documentaries go to their own folder, so Jellyfin
+or Plex can show them as a separate library. They are still movies to butaca. The
+only difference is which folder they live in, and that folder is the only record
+of it. Nothing else needs to stay in sync.
+
+```sh
+butaca add "The Social Dilemma" --year 2020 --lang en --documentary
+butaca find "Thinking Game 2024" --grab 1 --documentary
+butaca move "Social Dilemma" movies --dry-run   # shows from and to
+butaca move "Social Dilemma" documentaries
+```
+
+With a TMDB key, a film TMDB tags as Documentary goes there automatically;
+`--documentary=false` overrides that. `move` renames the folder, so the hardlink
+to the download and the subtitles next to the video go with it. Over MCP, the
+same thing is `documentary` on `add` and `find`, plus the `move` tool.
 
 ## Profiles
 

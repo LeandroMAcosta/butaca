@@ -89,9 +89,13 @@ func newDiskCmd() *cobra.Command {
 				}
 				for _, p := range []struct{ label, path string }{
 					{"movies", a.Cfg.Paths.Movies},
+					{"docs", a.Cfg.Paths.Documentaries},
 					{"series", a.Cfg.Paths.TV},
 					{"downloads", a.Cfg.Paths.Downloads},
 				} {
+					if p.path == "" {
+						continue
+					}
 					u, err := library.Usage(p.path)
 					if err != nil {
 						fmt.Printf("%-10s %s: %v\n", p.label, p.path, err)

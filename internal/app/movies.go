@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	"github.com/LeandroMAcosta/butaca/internal/decide"
@@ -19,6 +18,9 @@ type AddOptions struct {
 	OriginalLanguage string
 	AltTitles        []string
 	Monitored        bool
+	// Documentary picks the library: true or false decides it, nil lets TMDB's
+	// genre decide when a documentaries library is configured.
+	Documentary *bool
 }
 
 var ErrNoMatch = errors.New("no metadata match")
@@ -34,6 +36,7 @@ func (a *App) AddMovie(ctx context.Context, title string, opt AddOptions) (*stor
 		Monitored:        opt.Monitored,
 	}
 
+	var genres []int
 	if a.TMDB.Enabled() {
 		results, err := a.TMDB.SearchMovie(ctx, title, opt.Year)
 		if err != nil {
@@ -43,6 +46,7 @@ func (a *App) AddMovie(ctx context.Context, title string, opt AddOptions) (*stor
 			return nil, fmt.Errorf("%w for %q on TMDB", ErrNoMatch, title)
 		}
 		m := results[0]
+		genres = m.GenreIDs
 		it.TMDBID = m.TMDBID
 		it.Title = m.Title
 		it.Year = m.Year()
@@ -56,7 +60,11 @@ func (a *App) AddMovie(ctx context.Context, title string, opt AddOptions) (*stor
 			"no TMDB API key: pass --lang with the film's original language (e.g. --lang fr) or set tmdb.api_key")
 	}
 
-	it.Path = filepath.Join(a.Cfg.Paths.Movies, library.MovieFolder(it.Title, it.Year))
+	folder, err := a.movieFolder(a.pickLibrary(opt.Documentary, genres), it.Title, it.Year)
+	if err != nil {
+		return nil, err
+	}
+	it.Path = folder
 	id, err := a.Store.AddItem(it)
 	if err != nil {
 		return nil, err
@@ -144,7 +152,11 @@ func (a *App) importOne(it *store.Item, contentPath string, episodeID *int64) (s
 			return "", err
 		}
 	} else {
-		res, err = library.ImportMovie(video, a.Cfg.Paths.Movies, it.Title, it.Year)
+		root, err := a.LibraryRoot(a.LibraryOf(it))
+		if err != nil {
+			return "", err
+		}
+		res, err = library.ImportMovie(video, root, it.Title, it.Year)
 		if err != nil {
 			return "", err
 		}

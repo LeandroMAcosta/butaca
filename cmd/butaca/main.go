@@ -67,6 +67,7 @@ func main() {
 		newProfileCmd(),
 		newRecommendCmd(),
 		newFindCmd(),
+		newMoveCmd(),
 		newRemovalsCmd(),
 	)
 

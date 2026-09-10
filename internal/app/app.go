@@ -185,6 +185,17 @@ func (a *App) Health(ctx context.Context) Health {
 	default:
 		h.Hardlinkable = true
 	}
+	if d := a.Cfg.Paths.Documentaries; h.Hardlinkable && d != "" {
+		same, err := library.SameFilesystem(a.Cfg.Paths.Downloads, d)
+		switch {
+		case err != nil:
+			h.Hardlinkable, h.HardlinkNote = false, err.Error()
+		case !same:
+			h.Hardlinkable = false
+			h.HardlinkNote = fmt.Sprintf("%s and %s are on different filesystems; documentary imports will fail",
+				a.Cfg.Paths.Downloads, d)
+		}
+	}
 	return h
 }
 

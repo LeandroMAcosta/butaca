@@ -20,6 +20,8 @@ services:
       TZ: ${TZ:-Europe/Madrid}
       BUTACA_DATA_DIR: /data
       BUTACA_MOVIES_PATH: ${MEDIA_ROOT:?set MEDIA_ROOT in .env}/movies
+      # Optional second movie library; empty keeps documentaries in movies/.
+      BUTACA_DOCUMENTARIES_PATH: ${DOCUMENTARIES_PATH:-}
       BUTACA_TV_PATH: ${MEDIA_ROOT}/tv
       BUTACA_DOWNLOADS_PATH: ${MEDIA_ROOT}/downloads
       BUTACA_PROWLARR_URL: http://prowlarr:9696

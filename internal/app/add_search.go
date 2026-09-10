@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/LeandroMAcosta/butaca/internal/decide"
-	"github.com/LeandroMAcosta/butaca/internal/library"
 	"github.com/LeandroMAcosta/butaca/internal/store"
 )
 
@@ -60,7 +59,7 @@ func atoiSafe(s string) int {
 
 // AddFromRelease creates a catalog entry out of a chosen release and grabs it.
 // Metadata comes from the parsed release name, then from TMDB when available.
-func (a *App) AddFromRelease(ctx context.Context, c decide.Candidate, fallbackTitle string) (*store.Item, error) {
+func (a *App) AddFromRelease(ctx context.Context, c decide.Candidate, fallbackTitle string, documentary *bool) (*store.Item, error) {
 	title := strings.TrimSpace(c.Parsed.Title)
 	if title == "" {
 		title = strings.TrimSpace(fallbackTitle)
@@ -77,9 +76,11 @@ func (a *App) AddFromRelease(ctx context.Context, c decide.Candidate, fallbackTi
 		State:     store.StateMonitored,
 		Source:    "manual",
 	}
+	var genres []int
 	if a.TMDB.Enabled() {
 		if results, err := a.TMDB.SearchMovie(ctx, title, c.Parsed.Year); err == nil && len(results) > 0 {
 			m := results[0]
+			genres = m.GenreIDs
 			it.TMDBID, it.Title, it.OriginalLanguage = m.TMDBID, m.Title, m.OriginalLanguage
 			if y := m.Year(); y > 0 {
 				it.Year = y
@@ -89,8 +90,11 @@ func (a *App) AddFromRelease(ctx context.Context, c decide.Candidate, fallbackTi
 			}
 		}
 	}
-	it.Path = library.MovieFolder(it.Title, it.Year)
-	it.Path = joinPath(a.Cfg.Paths.Movies, it.Path)
+	folder, err := a.movieFolder(a.pickLibrary(documentary, genres), it.Title, it.Year)
+	if err != nil {
+		return nil, err
+	}
+	it.Path = folder
 
 	id, err := a.Store.AddItem(it)
 	if err != nil {
@@ -103,11 +107,4 @@ func (a *App) AddFromRelease(ctx context.Context, c decide.Candidate, fallbackTi
 		return it, fmt.Errorf("added %s but could not grab it: %w", it.Title, err)
 	}
 	return it, nil
-}
-
-func joinPath(dir, name string) string {
-	if dir == "" {
-		return name
-	}
-	return strings.TrimRight(dir, "/") + "/" + name
 }
