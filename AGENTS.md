@@ -110,6 +110,12 @@ languages, a Letterboxd account and (via `items.profile_id`) its own watchlist.
   extension (a `.srt.orig` fails), alass reads only UTF-8, and ffsubsync logs
   through rich, which wraps at 80 columns off a terminal. `subsync.py` copies
   the subtitle to a UTF-8 `in.srt` and sets `COLUMNS` before parsing the log.
+- **An exact release year is weak evidence on TMDB.** Years differ by country:
+  Glazer's *Under the Skin* is 2014 there, and an obscure 2013 namesake matched
+  the catalogued year exactly. `tmdb-match` searches a year either side and
+  only takes a namesake that is clearly the film (see `narrow`).
+- **Copy the database with `sqlite3 .backup`, not `cp`.** It runs in WAL mode;
+  recent rows live in `butaca.db-wal` and a plain copy silently misses them.
 - **TUI commands guard against a nil `app`**, which is what makes the whole
   interface testable headlessly.
 

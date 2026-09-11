@@ -198,3 +198,10 @@ func ParseSize(s string) (int64, error) {
 	}
 	return int64(f * float64(mult)), nil
 }
+
+// SameTitle reports whether two titles are equal once case, accents and
+// punctuation are folded away: "Amelie" and "Amélie" are the same film.
+func SameTitle(a, b string) bool {
+	n := normalizeTitle(a)
+	return n != "" && n == normalizeTitle(b)
+}

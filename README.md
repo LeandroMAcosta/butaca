@@ -352,6 +352,20 @@ produces nothing. Needs a TMDB API key. A film reached from several of your
 titles outranks one reached from a single popular seed, and nothing already in
 the catalog is ever suggested back.
 
+Films added before a TMDB key was configured have no TMDB id, so they seed
+nothing. Adding the key does not fix them on its own; run:
+
+```sh
+butaca tmdb-match            # fill TMDB id, language and alternative titles
+butaca tmdb-match --apply    # also move films TMDB files under Documentary
+```
+
+It matches on title (or original title) within a year of the catalogued one,
+since release years differ by country. When several films share the title, it
+picks one only when that film is evident, and lists the candidates otherwise.
+Titles, paths and languages set by hand are never changed. Films that already
+have an id are skipped, so it is safe to run again.
+
 ## Languages
 
 ```sh

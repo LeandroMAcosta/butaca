@@ -69,6 +69,7 @@ func main() {
 		newFindCmd(),
 		newMoveCmd(),
 		newSubtitlesCmd(),
+		newTMDBMatchCmd(),
 		newRemovalsCmd(),
 	)
 
