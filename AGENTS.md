@@ -35,7 +35,7 @@ internal/
   letterboxd/          HTML scraper, deliberately isolated
   recommend/           ranking of TMDB suggestions
   scheduler/           background jobs for `serve`
-  mcpserver/           15 MCP tools
+  mcpserver/           17 MCP tools
   tui/                 bubbletea: setup wizard + five-tab browser
   migrate/             read Radarr/Sonarr databases
 sidecar/               butaca-parse
@@ -136,9 +136,8 @@ BUTACA_LETTERBOXD_USER=name go test ./internal/letterboxd/ -run Live
 The sidecar, for local work:
 
 ```sh
-cd sidecar && uv run --with fastapi --with 'uvicorn[standard]' \
-  --with guessit --with subliminal --with babelfish \
-  uvicorn app:app --port 8000
+cd sidecar && uv run --python 3.12 --with-requirements requirements.txt \
+  uvicorn app:app --port 8000     # needs ffmpeg; alass-cli optional
 ```
 
 Everything together: `docker compose up` (needs `PROWLARR_API_KEY` in `.env`).
@@ -161,7 +160,7 @@ those tests are the specification.
   tracker, so a popular film returns ~200 rows of which most are the same
   release twice and the rest are rejects. `internal/tui/candidates.go` merges by
   normalised title, keeps the best-seeded copy, shows one line each, and hides
-  rejects behind `x`. `cmd/butaca/find_cmd.go` does the same for the CLI.
+  rejects behind `x`. `app.DedupeReleases` does the same for the CLI and MCP `find`.
 - `find` / the TUI's `a` key work without TMDB by matching the query against
   release names; the item gets no `original_language`, which the engine reads as
   "no language constraint" rather than rejecting everything.
