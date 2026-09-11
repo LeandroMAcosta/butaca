@@ -34,16 +34,24 @@ type Result struct {
 type Client struct {
 	baseURL string
 	http    *http.Client
+	// slow serves subtitle calls: syncing one film against its audio can try
+	// ffsubsync twice and alass once, minutes each.
+	slow *http.Client
 }
 
 func New(baseURL string) *Client {
 	return &Client{
 		baseURL: strings.TrimRight(baseURL, "/"),
 		http:    &http.Client{Timeout: 2 * time.Minute},
+		slow:    &http.Client{Timeout: 45 * time.Minute},
 	}
 }
 
 func (c *Client) post(ctx context.Context, path string, in, out any) error {
+	return c.postWith(ctx, c.http, path, in, out)
+}
+
+func (c *Client) postWith(ctx context.Context, hc *http.Client, path string, in, out any) error {
 	body, err := json.Marshal(in)
 	if err != nil {
 		return err
@@ -53,7 +61,7 @@ func (c *Client) post(ctx context.Context, path string, in, out any) error {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := c.http.Do(req)
+	resp, err := hc.Do(req)
 	if err != nil {
 		return fmt.Errorf("butaca-parse unreachable at %s: %w", c.baseURL, err)
 	}
@@ -79,11 +87,63 @@ func (c *Client) Parse(ctx context.Context, titles []string) ([]Result, error) {
 type SubtitleResult struct {
 	Downloaded []string `json:"downloaded"`
 	Skipped    []string `json:"skipped"`
+	// Embedded lists requested languages the file already carries as a track.
+	Embedded []string          `json:"embedded"`
+	Results  []FetchedSubtitle `json:"results"`
 }
 
-func (c *Client) Subtitles(ctx context.Context, path string, languages []string) (*SubtitleResult, error) {
+// FetchedSubtitle is one downloaded subtitle. HashMatch means it was made for
+// this exact file, so it is left alone; anything else went through Sync.
+type FetchedSubtitle struct {
+	Lang      string       `json:"lang"`
+	Path      string       `json:"path"`
+	Provider  string       `json:"provider"`
+	Score     int          `json:"score"`
+	HashMatch bool         `json:"hash_match"`
+	Sync      *SyncOutcome `json:"sync"`
+}
+
+// SyncOutcome reports what happened to one subtitle.
+type SyncOutcome struct {
+	Status         string   `json:"status"` // synced | refetched | rejected | failed | skipped
+	Method         string   `json:"method"` // hash | embedded | audio | alass-embedded | alass-audio
+	OffsetSeconds  *float64 `json:"offset_seconds"`
+	FramerateScale *float64 `json:"framerate_scale"`
+	Score          *float64 `json:"score"`
+	Detail         string   `json:"detail"`
+	Attempts       []string `json:"attempts"`
+}
+
+func (o SyncOutcome) String() string {
+	s := o.Status
+	if o.Method != "" {
+		s += " via " + o.Method
+	}
+	if o.Detail != "" {
+		s += ": " + o.Detail
+	}
+	return s
+}
+
+// Subtitles fetches the missing languages for a video. releaseName is what
+// the file was called before import; it helps scoring and may be empty.
+func (c *Client) Subtitles(ctx context.Context, path string, languages []string, releaseName string) (*SubtitleResult, error) {
 	var out SubtitleResult
-	err := c.post(ctx, "/subtitles", map[string]any{"path": path, "languages": languages}, &out)
+	err := c.postWith(ctx, c.slow, "/subtitles", map[string]any{
+		"path": path, "languages": languages, "release_name": releaseName, "sync": true,
+	}, &out)
+	return &out, err
+}
+
+// Sync fixes the subtitle already next to a video: a hash-matched download
+// replaces it when one exists, otherwise it is synced in place. The sidecar
+// keeps the original as "<name>.<lang>.srt.orig" and skips it next time
+// unless force is set.
+func (c *Client) Sync(ctx context.Context, path, lang, releaseName string, force bool) (*SyncOutcome, error) {
+	var out SyncOutcome
+	err := c.postWith(ctx, c.slow, "/sync", map[string]any{
+		"path": path, "lang": lang, "release_name": releaseName, "force": force,
+	}, &out)
 	return &out, err
 }
 

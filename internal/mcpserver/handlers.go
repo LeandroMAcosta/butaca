@@ -249,26 +249,6 @@ func (s *Server) handleStatus(ctx context.Context, _ mcp.CallToolRequest) (*mcp.
 	return mcp.NewToolResultText(strings.TrimRight(b.String(), "\n")), nil
 }
 
-func (s *Server) handleSubtitles(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	ref := req.GetString("item", "")
-	if ref == "" {
-		got, err := s.app.FillSubtitleGaps(ctx)
-		if err != nil {
-			return fail(err), nil
-		}
-		return lines("subtitle sweep", got, "every file already has the configured subtitles"), nil
-	}
-	it, err := s.resolve(ref)
-	if err != nil {
-		return fail(err), nil
-	}
-	got, err := s.app.SubtitlesForItem(ctx, it)
-	if err != nil {
-		return fail(err), nil
-	}
-	return lines(it.Title, got, "nothing to fetch: "+it.Title+" already has its subtitles"), nil
-}
-
 func (s *Server) handleImport(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	got, err := s.app.ImportReady(ctx)
 	if err != nil {

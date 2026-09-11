@@ -109,8 +109,14 @@ func (s *Server) register() {
 	), s.handleStatus)
 
 	s.mcp.AddTool(mcp.NewTool("subtitles",
-		mcp.WithDescription("Fetch missing subtitles for one item, or for the whole library."),
-		mcp.WithString("item", mcp.Description("Catalog id or part of the title; omit to sweep everything")),
+		mcp.WithDescription(
+			"Fetch missing subtitles for one item, or for the whole library. With sync, "+
+				"fix the subtitles already there instead: replace each with one made for "+
+				"this exact file when available, otherwise sync it against an embedded "+
+				"subtitle or the audio. Originals are kept. Syncing can take minutes per film."),
+		mcp.WithString("item", mcp.Description("Catalog id or part of the title; omit for the whole library")),
+		mcp.WithBoolean("sync", mcp.Description("Sync the subtitles on disk instead of fetching missing ones")),
+		mcp.WithBoolean("force", mcp.Description("With sync, redo subtitles synced before, from their original")),
 	), s.handleSubtitles)
 
 	s.mcp.AddTool(mcp.NewTool("import",

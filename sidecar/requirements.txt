@@ -4,3 +4,5 @@ pydantic==2.10.4
 guessit==3.8.0
 subliminal==2.2.1
 babelfish==0.6.1
+ffsubsync==0.5.1
+srt==3.5.3

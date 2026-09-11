@@ -68,6 +68,7 @@ func main() {
 		newRecommendCmd(),
 		newFindCmd(),
 		newMoveCmd(),
+		newSubtitlesCmd(),
 		newRemovalsCmd(),
 	)
 

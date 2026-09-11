@@ -180,18 +180,10 @@ func (a *App) importOne(it *store.Item, contentPath string, episodeID *int64) (s
 
 	line := fmt.Sprintf("%s -> %s", it.Title, res.Destination)
 	if a.Cfg.Subtitles.Auto && len(a.Cfg.Subtitles.Languages) > 0 {
-		if n, err := a.fetchSubtitles(res.Destination); err == nil && n > 0 {
+		f := &store.File{ID: fileID, Path: res.Destination}
+		if _, n, err := a.fetchFor(context.Background(), it, f, a.Cfg.Subtitles.Languages); err == nil && n > 0 {
 			line += fmt.Sprintf(" (+%d subtitle)", n)
 		}
 	}
 	return line, nil
-}
-
-func (a *App) fetchSubtitles(videoPath string) (int, error) {
-	ctx := context.Background()
-	res, err := a.Parse.Subtitles(ctx, videoPath, a.Cfg.Subtitles.Languages)
-	if err != nil {
-		return 0, err
-	}
-	return len(res.Downloaded), nil
 }

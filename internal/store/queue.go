@@ -63,3 +63,13 @@ func (s *Store) Log(itemID int64, event, detail string) error {
 	_, err := s.db.Exec(`INSERT INTO history (item_id, event, detail) VALUES (?,?,?)`, id, event, detail)
 	return err
 }
+
+// LatestReleaseTitle is the name of the last release grabbed for an item, or
+// "" when nothing was. It is what the file was called before the import
+// renamed it, which subtitle scoring still needs.
+func (s *Store) LatestReleaseTitle(itemID int64) string {
+	var title string
+	_ = s.db.QueryRow(`SELECT release_title FROM queue WHERE item_id = ? ORDER BY id DESC LIMIT 1`,
+		itemID).Scan(&title)
+	return title
+}

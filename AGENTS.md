@@ -14,9 +14,9 @@ because their value is not worth reimplementing:
 And one sidecar of its own:
 
 - **butaca-parse** (`:8000`) — a small FastAPI service owning `guessit`
-  (release-name parsing), `subliminal` (subtitles) and `ffprobe` (audio and
-  subtitle tracks). Go owns state, concurrency and interfaces; Python owns the
-  three libraries not worth porting.
+  (release-name parsing), `subliminal` (subtitles), `ffsubsync` and `alass`
+  (subtitle sync) and `ffprobe` (audio and subtitle tracks). Go owns state,
+  concurrency and interfaces; Python owns the libraries not worth porting.
 
 ## Layout
 
@@ -98,11 +98,18 @@ languages, a Letterboxd account and (via `items.profile_id`) its own watchlist.
 - **Indexes on migrated columns go in `store.Open` after the ALTERs**, not in
   `schema.sql`: an old database cannot index a column that does not exist yet.
 - **Never query the database from a TUI view.** Views repaint on every keystroke.
+  Load into the model in `reload()`; `b.langs` exists for exactly this reason.
 - **qBittorrent inside Docker Desktop on macOS kills every container's egress.**
   The VM engine spends one host thread per guest flow; DHT opens thousands and
   macOS caps a process at 4096. `status` cannot see it because it only checks
   that Prowlarr answers, not that its indexers can. Run qBittorrent natively.
-  Load into the model in `reload()`; `b.langs` exists for exactly this reason.
+- **subliminal's `scan_video` does not compute file hashes.** Without
+  `refine(video, movie_refiners=("hash", ...))` no subtitle can hash-match, and
+  `Video.fromname` has neither hashes nor the release name the import removed.
+- **ffsubsync and alass are picky about their input.** Both choose the parser by
+  extension (a `.srt.orig` fails), alass reads only UTF-8, and ffsubsync logs
+  through rich, which wraps at 80 columns off a terminal. `subsync.py` copies
+  the subtitle to a UTF-8 `in.srt` and sets `COLUMNS` before parsing the log.
 - **TUI commands guard against a nil `app`**, which is what makes the whole
   interface testable headlessly.
 

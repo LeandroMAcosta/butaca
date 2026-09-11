@@ -1,13 +1,11 @@
 """butaca-parse — the Python half of butaca.
 
-Go owns state, concurrency and interfaces. This service owns the two libraries
-that are not worth porting: guessit (release-name parsing) and subliminal
-(subtitle search). Kept deliberately small.
+Go owns state, concurrency and interfaces. This service owns the libraries
+that are not worth porting: guessit (release-name parsing), subliminal
+(subtitle search), and ffsubsync plus alass (subtitle sync). Kept deliberately
+small: the subtitle logic lives in subfetch.py and subsync.py.
 """
 
-import json
-import shutil
-import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -16,7 +14,10 @@ from pydantic import BaseModel, Field
 
 from babelfish import Language
 from guessit import guessit
-from subliminal import Video, download_best_subtitles, save_subtitles
+
+from media import ProbeError, probe
+from subfetch import FetchResult, fetch, resync
+from subsync import SyncOutcome
 
 app = FastAPI(title="butaca-parse", version="1.0.0")
 
@@ -91,33 +92,49 @@ def parse(req: ParseRequest) -> list[ParseResult]:
 class SubtitleRequest(BaseModel):
     path: str
     languages: list[str] = Field(default_factory=lambda: ["es"])
+    # The name the file was downloaded under, before the import renamed it.
+    release_name: str | None = None
+    sync: bool = True
 
 
-class SubtitleResult(BaseModel):
-    downloaded: list[str] = Field(default_factory=list)
-    skipped: list[str] = Field(default_factory=list)
+def _video(path: str) -> Path:
+    video = Path(path)
+    if not video.is_file():
+        raise HTTPException(status_code=404, detail=f"no such file: {path}")
+    return video
 
 
-@app.post("/subtitles", response_model=SubtitleResult)
-def subtitles(req: SubtitleRequest) -> SubtitleResult:
-    video_path = Path(req.path)
-    if not video_path.is_file():
-        raise HTTPException(status_code=404, detail=f"no such file: {req.path}")
-
+def _check_languages(codes: list[str]) -> None:
     try:
-        langs = {Language.fromietf(code) for code in req.languages}
+        for code in codes:
+            Language.fromietf(code)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"bad language code: {exc}") from exc
 
-    video = Video.fromname(str(video_path))
-    # Embedded tracks count as present; subliminal skips languages already there.
-    found = download_best_subtitles([video], langs)
-    saved = save_subtitles(video, found[video])
 
-    downloaded = [str(video_path.with_suffix("")) + f".{s.language.alpha2}.srt" for s in saved]
-    got = {s.language.alpha2 for s in saved}
-    skipped = [c for c in req.languages if c not in got]
-    return SubtitleResult(downloaded=downloaded, skipped=skipped)
+@app.post("/subtitles", response_model=FetchResult)
+def subtitles(req: SubtitleRequest) -> FetchResult:
+    """Fetch the missing languages; sync whatever is not a hash match."""
+    video = _video(req.path)
+    _check_languages(req.languages)
+    return fetch(video, req.languages, req.release_name, req.sync)
+
+
+class SyncRequest(BaseModel):
+    path: str
+    lang: str = "es"
+    release_name: str | None = None
+    # Re-sync from the kept original even if this subtitle was synced before.
+    force: bool = False
+
+
+@app.post("/sync", response_model=SyncOutcome)
+def sync(req: SyncRequest) -> SyncOutcome:
+    """Fix the subtitle already next to a video: replace it with a hash match
+    when one exists, otherwise sync it in place. The original is kept."""
+    video = _video(req.path)
+    _check_languages([req.lang])
+    return resync(video, req.lang, req.release_name, req.force)
 
 
 class TracksRequest(BaseModel):
@@ -128,6 +145,7 @@ class Track(BaseModel):
     kind: str  # audio | subtitle
     lang: str
     title: str | None = None
+    codec: str | None = None
 
 
 class TracksResult(BaseModel):
@@ -142,33 +160,14 @@ def tracks(req: TracksRequest) -> TracksResult:
     release name nor the catalog can answer, because a single file can carry
     ten audio tracks and forty subtitle tracks.
     """
-    video = Path(req.path)
-    if not video.is_file():
-        raise HTTPException(status_code=404, detail=f"no such file: {req.path}")
-
-    ffprobe = shutil.which("ffprobe")
-    if not ffprobe:
-        raise HTTPException(status_code=501, detail="ffprobe is not installed in this image")
-
+    video = _video(req.path)
     try:
-        out = subprocess.run(
-            [ffprobe, "-v", "error", "-show_entries",
-             "stream=index,codec_type:stream_tags=language,title",
-             "-of", "json", str(video)],
-            capture_output=True, text=True, timeout=120, check=True,
-        ).stdout
-    except subprocess.CalledProcessError as exc:
-        raise HTTPException(status_code=422, detail=f"ffprobe failed: {exc.stderr[:200]}") from exc
-    except subprocess.TimeoutExpired as exc:
-        raise HTTPException(status_code=504, detail="ffprobe timed out") from exc
-
-    found: list[Track] = []
-    for stream in json.loads(out).get("streams", []):
-        kind = stream.get("codec_type")
-        if kind not in ("audio", "subtitle"):
-            continue
-        tags = stream.get("tags") or {}
-        # An untagged stream is common in older rips; "und" keeps it countable
-        # instead of silently dropping a track that exists.
-        found.append(Track(kind=kind, lang=tags.get("language") or "und", title=tags.get("title")))
-    return TracksResult(tracks=found)
+        streams = probe(video)
+    except ProbeError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    # An untagged stream is common in older rips; "und" keeps it countable
+    # instead of silently dropping a track that exists.
+    return TracksResult(tracks=[
+        Track(kind=s.kind, lang=s.lang, title=s.title, codec=s.codec)
+        for s in streams if s.kind in ("audio", "subtitle")
+    ])

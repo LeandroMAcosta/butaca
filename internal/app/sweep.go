@@ -86,18 +86,13 @@ func (a *App) FillSubtitleGaps(ctx context.Context) ([]string, error) {
 			if len(missing) == 0 {
 				continue
 			}
-			res, err := a.Parse.Subtitles(ctx, f.Path, missing)
+			got, n, err := a.fetchFor(ctx, it, f, missing)
 			if err != nil {
 				out = append(out, fmt.Sprintf("%s: %v", it.Title, err))
 				continue
 			}
-			for _, path := range res.Downloaded {
-				if _, err := a.Store.AddSubtitle(f.ID, langOf(path), path); err != nil {
-					continue
-				}
-			}
-			if len(res.Downloaded) > 0 {
-				out = append(out, fmt.Sprintf("%s: %d subtitle(s)", it.Title, len(res.Downloaded)))
+			if n > 0 {
+				out = append(out, got...)
 			}
 		}
 	}
@@ -143,14 +138,11 @@ func (a *App) SubtitlesForItem(ctx context.Context, it *store.Item) ([]string, e
 		if len(missing) == 0 {
 			continue
 		}
-		res, err := a.Parse.Subtitles(ctx, f.Path, missing)
+		got, _, err := a.fetchFor(ctx, it, f, missing)
 		if err != nil {
 			return out, err
 		}
-		for _, path := range res.Downloaded {
-			_, _ = a.Store.AddSubtitle(f.ID, langOf(path), path)
-			out = append(out, path)
-		}
+		out = append(out, got...)
 	}
 	return out, nil
 }

@@ -91,11 +91,13 @@ Settings → General. Point `prowlarr.url` at a routable address, not
 
 ### 3. butaca-parse — the Python sidecar
 
-Owns `guessit` (release-name parsing), `subliminal` (subtitles) and `ffprobe`:
+Owns `guessit` (release-name parsing), `subliminal` (subtitles), `ffsubsync`
+and `alass` (subtitle sync) and `ffprobe`. It needs `ffmpeg` on the PATH. `alass`
+is optional; without it the sidecar only uses ffsubsync:
 
 ```sh
-cd sidecar && uv run --with fastapi --with 'uvicorn[standard]' \
-  --with guessit --with subliminal --with babelfish \
+brew install ffmpeg alass          # Linux: apt install ffmpeg; alass from its GitHub releases
+cd sidecar && uv run --python 3.12 --with-requirements requirements.txt \
   uvicorn app:app --port 8000
 ```
 
@@ -361,6 +363,34 @@ butaca disk            # free space and what the library occupies
 Track data comes from the files themselves, not their names. One release here
 carries 10 audio and 44 subtitle tracks, which is why lists show `es fr en +7`
 and the detail view shows all of them.
+
+## Subtitle sync
+
+A subtitle is found by scanning the video file itself, not just its name. That
+computes the OpenSubtitles hash, and a hash match is a subtitle made for this
+exact release, so it is in sync already. The release name from before the import
+is passed along too, for scoring. Languages the file already carries as an
+embedded track are not downloaded.
+
+Anything that is not a hash match is synced right after download. It is synced
+against an embedded text subtitle when the file has one (in any language, English
+first), otherwise against the audio, with ffsubsync. If ffsubsync fails or does
+not trust its result, alass tries next, since it copes with subtitles cut
+differently. A shift of more than 60 seconds is rejected as a false match, and
+the subtitle is left as it was.
+
+```sh
+butaca subtitles "Ghost in the Shell" --sync   # fix the subtitles already on disk
+butaca subtitles --sync --all                  # the whole library
+butaca subtitles --sync --all --force          # redo, starting from the originals
+```
+
+`--sync` first looks for a hash match to replace the subtitle with. Only if there
+is none does it sync the one already there. The original is kept as
+`<name>.<lang>.srt.orig`. The name deliberately does not end in `.srt`, so Jellyfin
+does not list it as a second, out-of-sync track. A subtitle with an original next
+to it counts as done and is skipped next time. Every outcome goes to the history.
+Over MCP, the same thing is `subtitles` with `sync: true`.
 
 ## Series
 
